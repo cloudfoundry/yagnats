@@ -11,7 +11,6 @@ type Callback func(*Message)
 
 type Client struct {
 	writer chan Packet
-	reader *bufio.Reader
 
 	pongs chan *PongPacket
 	oks   chan *OKPacket
@@ -34,7 +33,6 @@ func Dial(addr string) (client *Client, err error) {
 
 	client = &Client{
 		writer:        make(chan Packet),
-		reader:        bufio.NewReader(conn),
 		pongs:         make(chan *PongPacket),
 		oks:           make(chan *OKPacket),
 		errs:          make(chan *ERRPacket),
@@ -42,6 +40,7 @@ func Dial(addr string) (client *Client, err error) {
 	}
 
 	go client.writePackets(conn)
+	go client.handlePackets(bufio.NewReader(conn))
 
 	return
 }
@@ -52,8 +51,6 @@ func (c *Client) Ping() *PongPacket {
 }
 
 func (c *Client) Connect(user, pass string) error {
-	go c.handlePackets()
-
 	c.sendPacket(&ConnectPacket{User: user, Pass: pass})
 
 	select {
@@ -104,9 +101,9 @@ func (c *Client) writePackets(conn net.Conn) {
 	}
 }
 
-func (c *Client) handlePackets() {
+func (c *Client) handlePackets(io *bufio.Reader) {
 	for {
-		packet, err := Parse(c.reader)
+		packet, err := Parse(io)
 		if err != nil {
 			// TODO
 			fmt.Printf("ERROR! %s\n", err)
