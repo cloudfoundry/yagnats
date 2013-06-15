@@ -21,9 +21,9 @@ type Client struct {
 }
 
 type Message struct {
-  Subject string
-  Payload string
-  ReplyTo string
+	Subject string
+	Payload string
+	ReplyTo string
 }
 
 func Dial(addr string) (client *Client, err error) {
@@ -33,12 +33,12 @@ func Dial(addr string) (client *Client, err error) {
 	}
 
 	client = &Client{
-		writer: conn,
-		reader: bufio.NewReader(conn),
-		pongs:  make(chan *PongPacket),
-		oks:    make(chan *OKPacket),
-		errs:   make(chan *ERRPacket),
-    subscriptions: make(map[int]Callback),
+		writer:        conn,
+		reader:        bufio.NewReader(conn),
+		pongs:         make(chan *PongPacket),
+		oks:           make(chan *OKPacket),
+		errs:          make(chan *ERRPacket),
+		subscriptions: make(map[int]Callback),
 	}
 
 	return
@@ -74,8 +74,8 @@ func (c *Client) Publish(subject, payload string) (err error) {
 }
 
 func (c *Client) Subscribe(subject string, callback Callback) (err error) {
-  id := len(c.subscriptions)
-  c.subscriptions[id] = callback
+	id := len(c.subscriptions)
+	c.subscriptions[id] = callback
 
 	_, err = c.sendPacket(
 		&SubPacket{
@@ -95,7 +95,7 @@ func (c *Client) handlePackets() {
 	for {
 		packet, err := Parse(c.reader)
 		if err != nil {
-		  // TODO
+			// TODO
 			fmt.Printf("ERROR! %s\n", err)
 			break
 		}
@@ -121,14 +121,14 @@ func (c *Client) handlePackets() {
 			}
 		case *InfoPacket:
 		case *MsgPacket:
-      msg := packet.(*MsgPacket)
-		  c.subscriptions[msg.SubID](
-		    &Message{
-          Subject: msg.Subject,
-          Payload: msg.Payload,
-          ReplyTo: msg.ReplyTo,
-        },
-		  )
+			msg := packet.(*MsgPacket)
+			c.subscriptions[msg.SubID](
+				&Message{
+					Subject: msg.Subject,
+					Payload: msg.Payload,
+					ReplyTo: msg.ReplyTo,
+				},
+			)
 		default:
 			// TODO
 			fmt.Printf("Unhandled packet: %#v\n", packet)
