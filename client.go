@@ -10,7 +10,7 @@ import (
 type Callback func(*Message)
 
 type Client struct {
-	writer net.Conn
+	writer chan Packet
 	reader *bufio.Reader
 
 	pongs chan *PongPacket
@@ -33,13 +33,15 @@ func Dial(addr string) (client *Client, err error) {
 	}
 
 	client = &Client{
-		writer:        conn,
+		writer:        make(chan Packet),
 		reader:        bufio.NewReader(conn),
 		pongs:         make(chan *PongPacket),
 		oks:           make(chan *OKPacket),
 		errs:          make(chan *ERRPacket),
 		subscriptions: make(map[int]Callback),
 	}
+
+	go client.writePackets(conn)
 
 	return
 }
@@ -62,33 +64,44 @@ func (c *Client) Connect(user, pass string) error {
 	}
 }
 
-func (c *Client) Publish(subject, payload string) (err error) {
-	_, err = c.sendPacket(
+func (c *Client) Publish(subject, payload string)  {
+	c.sendPacket(
 		&PubPacket{
 			Subject: subject,
 			Payload: payload,
 		},
 	)
-
-	return
 }
 
-func (c *Client) Subscribe(subject string, callback Callback) (err error) {
+func (c *Client) Subscribe(subject string, callback Callback) {
 	id := len(c.subscriptions)
 	c.subscriptions[id] = callback
 
-	_, err = c.sendPacket(
+	c.sendPacket(
 		&SubPacket{
 			Subject: subject,
 			ID:      id,
 		},
 	)
-
-	return
 }
 
-func (c *Client) sendPacket(packet Packet) (int, error) {
-	return c.writer.Write(packet.Encode())
+func (c *Client) sendPacket(packet Packet) {
+	c.writer <- packet
+}
+
+func (c *Client) writePackets(conn net.Conn) {
+  for {
+    packet := <-c.writer
+
+    // TODO: check if written == packet length?
+    _, err := conn.Write(packet.Encode())
+
+    if err != nil {
+      // TODO
+      fmt.Printf("Connection lost!")
+      return
+    }
+  }
 }
 
 func (c *Client) handlePackets() {
