@@ -64,7 +64,7 @@ func (c *Client) Connect(user, pass string) error {
 	}
 }
 
-func (c *Client) Publish(subject, payload string)  {
+func (c *Client) Publish(subject, payload string) {
 	c.sendPacket(
 		&PubPacket{
 			Subject: subject,
@@ -90,18 +90,18 @@ func (c *Client) sendPacket(packet Packet) {
 }
 
 func (c *Client) writePackets(conn net.Conn) {
-  for {
-    packet := <-c.writer
+	for {
+		packet := <-c.writer
 
-    // TODO: check if written == packet length?
-    _, err := conn.Write(packet.Encode())
+		// TODO: check if written == packet length?
+		_, err := conn.Write(packet.Encode())
 
-    if err != nil {
-      // TODO
-      fmt.Printf("Connection lost!")
-      return
-    }
-  }
+		if err != nil {
+			// TODO
+			fmt.Printf("Connection lost!")
+			return
+		}
+	}
 }
 
 func (c *Client) handlePackets() {
