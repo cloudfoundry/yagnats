@@ -200,11 +200,11 @@ func (s *YSuite) TestClientPublishWithReply(c *C) {
 	payload := make(chan string)
 
 	s.Client.Subscribe("some.request", func(msg *Message) {
-	  s.Client.Publish(msg.ReplyTo, "response!")
+		s.Client.Publish(msg.ReplyTo, "response!")
 	})
 
 	s.Client.Subscribe("some.reply", func(msg *Message) {
-	  payload <- msg.Payload
+		payload <- msg.Payload
 	})
 
 	s.Client.PublishWithReplyTo("some.request", "hello!", "some.reply")

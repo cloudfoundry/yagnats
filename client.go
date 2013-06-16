@@ -92,7 +92,7 @@ func (c *Client) PublishWithReplyTo(subject, payload, reply string) error {
 		&PubPacket{
 			Subject: subject,
 			Payload: payload,
-      ReplyTo: reply,
+			ReplyTo: reply,
 		},
 	)
 
