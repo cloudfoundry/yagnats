@@ -1,21 +1,13 @@
 package yagnats
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
-	"net"
 )
 
 type Callback func(*Message)
 
 type Client struct {
-	writer chan Packet
-
-	pongs chan *PongPacket
-	oks   chan *OKPacket
-	errs  chan error
-
+	connection    chan *Connection
 	subscriptions map[int]*Subscription
 }
 
@@ -31,64 +23,48 @@ type Subscription struct {
 	ID       int
 }
 
-func Dial(addr string) (client *Client, err error) {
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewClient(conn), nil
-}
-
-func NewClient(conn net.Conn) (client *Client) {
-	client = &Client{
-		writer:        make(chan Packet),
-		pongs:         make(chan *PongPacket),
-		oks:           make(chan *OKPacket),
-		errs:          make(chan error),
+func NewClient() *Client {
+	return &Client{
+		connection:    make(chan *Connection),
 		subscriptions: make(map[int]*Subscription),
 	}
-
-	go client.writePackets(conn)
-	go client.handlePackets(bufio.NewReader(conn))
-
-	return
 }
 
 func (c *Client) Ping() *PongPacket {
-	c.sendPacket(&PingPacket{})
-	return <-c.pongs
+	conn := <-c.connection
+	conn.Send(&PingPacket{})
+	return <-conn.PONGs
 }
 
-func (c *Client) Connect(user, pass string) error {
-	c.sendPacket(&ConnectPacket{User: user, Pass: pass})
-
-	select {
-	case <-c.oks:
-		return nil
-	case err := <-c.errs:
+func (c *Client) Connect(addr, user, pass string) error {
+	conn, err := c.connect(addr, user, pass)
+	if err != nil {
 		return err
 	}
+
+	go c.serveConnections(conn, addr, user, pass)
+	go c.dispatchMessages()
+
+	return nil
 }
 
 func (c *Client) Publish(subject, payload string) error {
-	c.sendPacket(
+	conn := <-c.connection
+
+	conn.Send(
 		&PubPacket{
 			Subject: subject,
 			Payload: payload,
 		},
 	)
 
-	select {
-	case err := <-c.errs:
-		return err
-	case <-c.oks:
-		return nil
-	}
+	return conn.ErrOrOK()
 }
 
 func (c *Client) PublishWithReplyTo(subject, payload, reply string) error {
-	c.sendPacket(
+	conn := <-c.connection
+
+	conn.Send(
 		&PubPacket{
 			Subject: subject,
 			Payload: payload,
@@ -96,15 +72,12 @@ func (c *Client) PublishWithReplyTo(subject, payload, reply string) error {
 		},
 	)
 
-	select {
-	case err := <-c.errs:
-		return err
-	case <-c.oks:
-		return nil
-	}
+	return conn.ErrOrOK()
 }
 
 func (c *Client) Subscribe(subject string, callback Callback) (int, error) {
+	conn := <-c.connection
+
 	id := len(c.subscriptions) + 1
 
 	c.subscriptions[id] = &Subscription{
@@ -113,19 +86,29 @@ func (c *Client) Subscribe(subject string, callback Callback) (int, error) {
 		Callback: callback,
 	}
 
-	c.sendPacket(
+	conn.Send(
 		&SubPacket{
 			Subject: subject,
 			ID:      id,
 		},
 	)
 
-	select {
-	case err := <-c.errs:
+	err := conn.ErrOrOK()
+	if err != nil {
 		return -1, err
-	case <-c.oks:
-		return id, nil
 	}
+
+	return id, nil
+}
+
+func (c *Client) Unsubscribe(sid int) error {
+	conn := <-c.connection
+
+	conn.Send(&UnsubPacket{ID: sid})
+
+	delete(c.subscriptions, sid)
+
+	return conn.ErrOrOK()
 }
 
 func (c *Client) UnsubscribeAll(subject string) {
@@ -136,81 +119,68 @@ func (c *Client) UnsubscribeAll(subject string) {
 	}
 }
 
-func (c *Client) Unsubscribe(sid int) error {
-	c.sendPacket(&UnsubPacket{ID: sid})
+func (c *Client) connect(addr, user, pass string) (conn *Connection, err error) {
+	conn = NewConnection(addr, user, pass)
 
-	select {
-	case err := <-c.errs:
-		return err
-	case <-c.oks:
-		delete(c.subscriptions, sid)
-		return nil
+	err = conn.Dial()
+	if err != nil {
+		fmt.Printf("Dial failed!\n")
+		return
 	}
-}
 
-func (c *Client) sendPacket(packet Packet) {
-	c.writer <- packet
-}
-
-func (c *Client) writePackets(conn net.Conn) {
-	for {
-		packet := <-c.writer
-
-		// TODO: check if written == packet length?
-		written, err := conn.Write(packet.Encode())
-
-		if err != nil {
-			// TODO
-			fmt.Printf("Error: %s (wrote %d)\n", err, written)
-			return
-		}
+	err = conn.Handshake()
+	if err != nil {
+		fmt.Printf("Handshake failed!\n")
+		return
 	}
+
+	return
 }
 
-func (c *Client) handlePackets(io *bufio.Reader) {
+func (c *Client) serveConnections(conn *Connection, addr, user, pass string) {
+	var err error
+
 	for {
-		packet, err := Parse(io)
-		if err != nil {
-			// TODO
-			fmt.Printf("ERROR! %s\n", err)
-			break
+		// serve connection until disconnected
+		for stop := false; !stop; {
+			select {
+			case <-conn.Disconnected:
+				stop = true
+
+			case c.connection <- conn:
+			}
 		}
 
-		switch packet.(type) {
-		case *PongPacket:
-			c.pongs <- packet.(*PongPacket)
-
-		case *OKPacket:
-			c.oks <- packet.(*OKPacket)
-
-		case *ERRPacket:
-			c.errs <- errors.New(packet.(*ERRPacket).Message)
-
-		case *InfoPacket:
-			// noop
-
-		case *PingPacket:
-			c.sendPacket(&PongPacket{})
-
-		case *MsgPacket:
-			msg := packet.(*MsgPacket)
-			sub := c.subscriptions[msg.SubID]
-			if sub == nil {
-				fmt.Printf("Warning: Message for unknown subscription (%s, %d): %#v\n", msg.Subject, msg.SubID, msg)
+		// acquire new connection
+		for {
+			conn, err = c.connect(addr, user, pass)
+			if err == nil {
+				// TODO: resubscribe/etc.
 				break
 			}
 
-			go sub.Callback(
-				&Message{
-					Subject: msg.Subject,
-					Payload: msg.Payload,
-					ReplyTo: msg.ReplyTo,
-				},
-			)
-
-		default:
-			// TODO
-			fmt.Printf("Unhandled packet: %#v\n", packet)
+			// TODO: add small sleep to prevent thrashing?
 		}
+	}
+}
+
+func (c *Client) dispatchMessages() {
+	for {
+		conn := <-c.connection
+		msg := <-conn.MSGs
+
+		sub := c.subscriptions[msg.SubID]
+		if sub == nil {
+			fmt.Printf("Warning: Message for unknown subscription (%s, %d): %#v\n", msg.Subject, msg.SubID, msg)
+			break
+		}
+
+		go sub.Callback(
+			&Message{
+				Subject: msg.Subject,
+				Payload: msg.Payload,
+				ReplyTo: msg.ReplyTo,
+			},
+		)
 	}
 }

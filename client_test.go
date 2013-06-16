@@ -1,9 +1,7 @@
 package yagnats
 
 import (
-	"bytes"
 	. "launchpad.net/gocheck"
-	"net"
 	"testing"
 	"time"
 )
@@ -16,48 +14,47 @@ type YSuite struct {
 
 var _ = Suite(&YSuite{})
 
+func (s *YSuite) SetUpSuite(c *C) {
+	startNats(4223)
+	waitUntilNatsUp(4223)
+}
+
 func (s *YSuite) SetUpTest(c *C) {
-	client, err := Dial("127.0.0.1:4222")
-	if err != nil {
-		c.Error("Cannot contact NATS at 127.0.0.1:4222")
-	}
+	client := NewClient()
+
+	client.Connect("127.0.0.1:4223", "nats", "nats")
 
 	s.Client = client
 }
 
 func (s *YSuite) TearDownTest(c *C) {
+	//s.Client.Disconnect()
 	s.Client = nil
 }
 
-func (s *YSuite) TestDialWithValidAddress(c *C) {
-	c.Assert(s.Client, Not(Equals), nil)
-}
+func (s *YSuite) TestConnectWithInvalidAddress(c *C) {
+	badClient := NewClient()
 
-func (s *YSuite) TestDialWithInvalidAddress(c *C) {
-	_, err := Dial("")
+	err := badClient.Connect("", "cats", "bats")
+
 	c.Assert(err, Not(Equals), nil)
 	c.Assert(err.Error(), Equals, "dial tcp: missing address")
 }
 
-func (s *YSuite) TestClientConnect(c *C) {
-	c.Assert(s.Client.Connect("foo", "bar"), Equals, nil)
-}
-
 func (s *YSuite) TestClientConnectWithInvalidAuth(c *C) {
-	err := s.Client.Connect("foo", "invalid")
+	badClient := NewClient()
+
+	err := badClient.Connect("127.0.0.1:4223", "cats", "bats")
 
 	c.Assert(err, Not(Equals), nil)
 	c.Assert(err.Error(), Equals, "Authorization failed")
 }
 
 func (s *YSuite) TestClientPing(c *C) {
-	s.Client.Connect("foo", "bar")
 	c.Assert(s.Client.Ping(), Equals, &PongPacket{})
 }
 
 func (s *YSuite) TestClientSubscribe(c *C) {
-	s.Client.Connect("foo", "bar")
-
 	sub, _ := s.Client.Subscribe("some.subject", func(msg *Message) {})
 	c.Assert(sub, Equals, 1)
 
@@ -66,8 +63,6 @@ func (s *YSuite) TestClientSubscribe(c *C) {
 }
 
 func (s *YSuite) TestClientUnsubscribe(c *C) {
-	s.Client.Connect("foo", "bar")
-
 	payload1 := make(chan string)
 	payload2 := make(chan string)
 
@@ -98,8 +93,6 @@ func (s *YSuite) TestClientUnsubscribe(c *C) {
 }
 
 func (s *YSuite) TestClientUnsubscribeInvalid(c *C) {
-	s.Client.Connect("foo", "bar")
-
 	err := s.Client.Unsubscribe(42)
 
 	c.Assert(err, Not(Equals), nil)
@@ -107,8 +100,6 @@ func (s *YSuite) TestClientUnsubscribeInvalid(c *C) {
 }
 
 func (s *YSuite) TestClientSubscribeAndUnsubscribe(c *C) {
-	s.Client.Connect("foo", "bar")
-
 	payload := make(chan string)
 
 	sid1, _ := s.Client.Subscribe("some.subject", func(msg *Message) {
@@ -137,8 +128,6 @@ func (s *YSuite) TestClientSubscribeAndUnsubscribe(c *C) {
 }
 
 func (s *YSuite) TestClientPublishTooBig(c *C) {
-	s.Client.Connect("foo", "bar")
-
 	payload := make([]byte, 10240000)
 	err := s.Client.Publish("foo", string(payload))
 
@@ -146,9 +135,20 @@ func (s *YSuite) TestClientPublishTooBig(c *C) {
 	c.Assert(err.Error(), Equals, "Payload size exceeded")
 }
 
-func (s *YSuite) TestClientSubscribeInvalidSubject(c *C) {
-	s.Client.Connect("foo", "bar")
+func (s *YSuite) TestClientPublishTooBigRecoverable(c *C) {
+	payload := make([]byte, 10240000)
 
+	err := s.Client.Publish("foo", string(payload))
+
+	c.Assert(err, Not(Equals), nil)
+	c.Assert(err.Error(), Equals, "Payload size exceeded")
+
+	err = s.Client.Publish("some.publish", "bar")
+
+	c.Assert(err, Equals, nil)
+}
+
+func (s *YSuite) TestClientSubscribeInvalidSubject(c *C) {
 	sid, err := s.Client.Subscribe(">.a", func(msg *Message) {})
 
 	c.Assert(err, Not(Equals), nil)
@@ -157,8 +157,6 @@ func (s *YSuite) TestClientSubscribeInvalidSubject(c *C) {
 }
 
 func (s *YSuite) TestClientUnsubscribeAll(c *C) {
-	s.Client.Connect("foo", "bar")
-
 	payload := make(chan string)
 
 	s.Client.Subscribe("some.subject", func(msg *Message) {
@@ -181,8 +179,6 @@ func (s *YSuite) TestClientUnsubscribeAll(c *C) {
 }
 
 func (s *YSuite) TestClientPubSub(c *C) {
-	s.Client.Connect("foo", "bar")
-
 	payload := make(chan string)
 
 	s.Client.Subscribe("some.subject", func(msg *Message) {
@@ -195,8 +191,6 @@ func (s *YSuite) TestClientPubSub(c *C) {
 }
 
 func (s *YSuite) TestClientPublishWithReply(c *C) {
-	s.Client.Connect("foo", "bar")
-
 	payload := make(chan string)
 
 	s.Client.Subscribe("some.request", func(msg *Message) {
@@ -212,20 +206,6 @@ func (s *YSuite) TestClientPublishWithReply(c *C) {
 	waitReceive(c, "response!", payload, 500)
 }
 
-func (s *YSuite) TestClientPong(c *C) {
-	conn := &fakeConn{
-		Buffer:    bytes.NewBuffer([]byte("PING\r\n")),
-		Received:  bytes.NewBuffer([]byte{}),
-		WriteChan: make(chan string),
-	}
-
-	s.Client = NewClient(conn)
-
-	time.Sleep(1 * time.Second)
-
-	waitReceive(c, "PONG\r\n", conn.WriteChan, 500)
-}
-
 func waitReceive(c *C, expected string, from chan string, ms time.Duration) {
 	select {
 	case msg := <-from:
@@ -233,45 +213,4 @@ func waitReceive(c *C, expected string, from chan string, ms time.Duration) {
 	case <-time.After(ms * time.Millisecond):
 		c.Error("Timed out waiting for message.")
 	}
-}
-
-type fakeConn struct {
-	Buffer    *bytes.Buffer
-	Received  *bytes.Buffer
-	WriteChan chan string
-}
-
-func (f *fakeConn) Read(b []byte) (n int, err error) {
-	return f.Buffer.Read(b)
-}
-
-func (f *fakeConn) Write(b []byte) (n int, err error) {
-	f.WriteChan <- string(b)
-	return f.Received.Write(b)
-}
-
-func (f *fakeConn) Close() error {
-	return nil
-}
-
-func (f *fakeConn) SetDeadline(time.Time) error {
-	return nil
-}
-
-func (f *fakeConn) SetReadDeadline(time.Time) error {
-	return nil
-}
-
-func (f *fakeConn) SetWriteDeadline(time.Time) error {
-	return nil
-}
-
-func (f *fakeConn) LocalAddr() net.Addr {
-	addr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:4222")
-	return addr
-}
-
-func (f *fakeConn) RemoteAddr() net.Addr {
-	addr, _ := net.ResolveTCPAddr("tcp", "0.0.0.0:65525")
-	return addr
 }
