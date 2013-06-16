@@ -194,6 +194,24 @@ func (s *YSuite) TestClientPubSub(c *C) {
 	waitReceive(c, "hello!", payload, 500)
 }
 
+func (s *YSuite) TestClientPublishWithReply(c *C) {
+	s.Client.Connect("foo", "bar")
+
+	payload := make(chan string)
+
+	s.Client.Subscribe("some.request", func(msg *Message) {
+	  s.Client.Publish(msg.ReplyTo, "response!")
+	})
+
+	s.Client.Subscribe("some.reply", func(msg *Message) {
+	  payload <- msg.Payload
+	})
+
+	s.Client.PublishWithReplyTo("some.request", "hello!", "some.reply")
+
+	waitReceive(c, "response!", payload, 500)
+}
+
 func (s *YSuite) TestClientPong(c *C) {
 	conn := &fakeConn{
 		Buffer:    bytes.NewBuffer([]byte("PING\r\n")),

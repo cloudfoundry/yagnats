@@ -87,6 +87,23 @@ func (c *Client) Publish(subject, payload string) error {
 	}
 }
 
+func (c *Client) PublishWithReplyTo(subject, payload, reply string) error {
+	c.sendPacket(
+		&PubPacket{
+			Subject: subject,
+			Payload: payload,
+      ReplyTo: reply,
+		},
+	)
+
+	select {
+	case err := <-c.errs:
+		return err
+	case <-c.oks:
+		return nil
+	}
+}
+
 func (c *Client) Subscribe(subject string, callback Callback) (int, error) {
 	id := len(c.subscriptions) + 1
 
