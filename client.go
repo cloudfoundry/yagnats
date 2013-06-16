@@ -37,6 +37,10 @@ func Dial(addr string) (client *Client, err error) {
 		return nil, err
 	}
 
+	return NewClient(conn), nil
+}
+
+func NewClient(conn net.Conn) (client *Client) {
 	client = &Client{
 		writer:        make(chan Packet),
 		pongs:         make(chan *PongPacket),
@@ -143,19 +147,27 @@ func (c *Client) handlePackets(io *bufio.Reader) {
 			case c.pongs <- packet.(*PongPacket):
 			default:
 			}
+
 		// TODO: inelegant
 		case *OKPacket:
 			select {
 			case c.oks <- packet.(*OKPacket):
 			default:
 			}
+
 		// TODO: inelegant
 		case *ERRPacket:
 			select {
 			case c.errs <- packet.(*ERRPacket):
 			default:
 			}
+
 		case *InfoPacket:
+			// noop
+
+		case *PingPacket:
+			c.sendPacket(&PongPacket{})
+
 		case *MsgPacket:
 			msg := packet.(*MsgPacket)
 			sub := c.subscriptions[msg.SubID]
@@ -171,6 +183,7 @@ func (c *Client) handlePackets(io *bufio.Reader) {
 					ReplyTo: msg.ReplyTo,
 				},
 			)
+
 		default:
 			// TODO
 			fmt.Printf("Unhandled packet: %#v\n", packet)
