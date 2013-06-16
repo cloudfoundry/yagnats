@@ -8,14 +8,11 @@ A simple client for NATS written in Go.
 Basic usage:
 
 ```go
-client, err := yagnats.Dial("127.0.0.1:4222")
-if err != nil {
-  panic("Can't contact it, dude.")
-}
+client := yagnats.NewClient()
 
-err = client.Connect("user", "pass")
+err := client.Connect("127.0.0.1:4222", "user", "pass")
 if err != nil {
-  panic("Wrong auth, numbnuts.")
+  panic("Wrong auth or something.")
 }
 
 client.Subscribe("some.subject", func(msg *Message) {
