@@ -30,20 +30,14 @@ func (s *YSuite) TestConnectEncode(c *C) {
 	c.Assert(string(encoded[0:8]), Equals, "CONNECT ")
 
 	payload := encoded[8:]
-	parsed_payload := make(map[string]string)
 
-	json.Unmarshal(payload, &parsed_payload)
+	parsed := &connectionPayload{}
+	json.Unmarshal(payload, &parsed)
 
-	expected := map[string]string{
-		"verbose":  "false",
-		"pedantic": "false",
-		"user":     "foo",
-		"pass":     "bar",
-	}
-
-	for k, v := range expected {
-		c.Check(parsed_payload[k], Equals, v)
-	}
+	c.Check(parsed.Verbose, Equals, true)
+	c.Check(parsed.Pedantic, Equals, true)
+	c.Check(parsed.User, Equals, "foo")
+	c.Check(parsed.Pass, Equals, "bar")
 }
 
 func (s *YSuite) TestOKEncode(c *C) {

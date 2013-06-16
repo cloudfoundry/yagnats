@@ -34,12 +34,19 @@ type ConnectPacket struct {
 	Pass string
 }
 
+type connectionPayload struct {
+	User     string `json:"user"`
+	Pass     string `json:"pass"`
+	Verbose  bool   `json:"verbose"`
+	Pedantic bool   `json:"pedantic"`
+}
+
 func (p *ConnectPacket) Encode() []byte {
-	payload := map[string]string{
-		"verbose":  "false",
-		"pedantic": "false",
-		"user":     p.User,
-		"pass":     p.Pass,
+	payload := connectionPayload{
+		Verbose:  true,
+		Pedantic: true,
+		User:     p.User,
+		Pass:     p.Pass,
 	}
 
 	json, err := json.Marshal(payload)

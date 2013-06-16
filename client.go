@@ -14,7 +14,7 @@ type Client struct {
 
 	pongs chan *PongPacket
 	oks   chan *OKPacket
-	errs  chan *ERRPacket
+	errs  chan error
 
 	subscriptions map[int]*Subscription
 }
@@ -45,7 +45,7 @@ func NewClient(conn net.Conn) (client *Client) {
 		writer:        make(chan Packet),
 		pongs:         make(chan *PongPacket),
 		oks:           make(chan *OKPacket),
-		errs:          make(chan *ERRPacket),
+		errs:          make(chan error),
 		subscriptions: make(map[int]*Subscription),
 	}
 
@@ -67,20 +67,27 @@ func (c *Client) Connect(user, pass string) error {
 	case <-c.oks:
 		return nil
 	case err := <-c.errs:
-		return errors.New(err.Message)
+		return err
 	}
 }
 
-func (c *Client) Publish(subject, payload string) {
+func (c *Client) Publish(subject, payload string) error {
 	c.sendPacket(
 		&PubPacket{
 			Subject: subject,
 			Payload: payload,
 		},
 	)
+
+	select {
+	case err := <-c.errs:
+		return err
+	case <-c.oks:
+		return nil
+	}
 }
 
-func (c *Client) Subscribe(subject string, callback Callback) int {
+func (c *Client) Subscribe(subject string, callback Callback) (int, error) {
 	id := len(c.subscriptions) + 1
 
 	c.subscriptions[id] = &Subscription{
@@ -96,7 +103,12 @@ func (c *Client) Subscribe(subject string, callback Callback) int {
 		},
 	)
 
-	return id
+	select {
+	case err := <-c.errs:
+		return -1, err
+	case <-c.oks:
+		return id, nil
+	}
 }
 
 func (c *Client) UnsubscribeAll(subject string) {
@@ -107,9 +119,16 @@ func (c *Client) UnsubscribeAll(subject string) {
 	}
 }
 
-func (c *Client) Unsubscribe(sid int) {
+func (c *Client) Unsubscribe(sid int) error {
 	c.sendPacket(&UnsubPacket{ID: sid})
-	delete(c.subscriptions, sid)
+
+	select {
+	case err := <-c.errs:
+		return err
+	case <-c.oks:
+		delete(c.subscriptions, sid)
+		return nil
+	}
 }
 
 func (c *Client) sendPacket(packet Packet) {
@@ -121,11 +140,11 @@ func (c *Client) writePackets(conn net.Conn) {
 		packet := <-c.writer
 
 		// TODO: check if written == packet length?
-		_, err := conn.Write(packet.Encode())
+		written, err := conn.Write(packet.Encode())
 
 		if err != nil {
 			// TODO
-			fmt.Printf("Connection lost!")
+			fmt.Printf("Error: %s (wrote %d)\n", err, written)
 			return
 		}
 	}
@@ -141,26 +160,14 @@ func (c *Client) handlePackets(io *bufio.Reader) {
 		}
 
 		switch packet.(type) {
-		// TODO: inelegant
 		case *PongPacket:
-			select {
-			case c.pongs <- packet.(*PongPacket):
-			default:
-			}
+			c.pongs <- packet.(*PongPacket)
 
-		// TODO: inelegant
 		case *OKPacket:
-			select {
-			case c.oks <- packet.(*OKPacket):
-			default:
-			}
+			c.oks <- packet.(*OKPacket)
 
-		// TODO: inelegant
 		case *ERRPacket:
-			select {
-			case c.errs <- packet.(*ERRPacket):
-			default:
-			}
+			c.errs <- errors.New(packet.(*ERRPacket).Message)
 
 		case *InfoPacket:
 			// noop
@@ -176,7 +183,7 @@ func (c *Client) handlePackets(io *bufio.Reader) {
 				break
 			}
 
-			sub.Callback(
+			go sub.Callback(
 				&Message{
 					Subject: msg.Subject,
 					Payload: msg.Payload,

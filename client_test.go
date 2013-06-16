@@ -58,10 +58,10 @@ func (s *YSuite) TestClientPing(c *C) {
 func (s *YSuite) TestClientSubscribe(c *C) {
 	s.Client.Connect("foo", "bar")
 
-	sub := s.Client.Subscribe("some.subject", func(msg *Message) {})
+	sub, _ := s.Client.Subscribe("some.subject", func(msg *Message) {})
 	c.Assert(sub, Equals, 1)
 
-	sub2 := s.Client.Subscribe("some.subject", func(msg *Message) {})
+	sub2, _ := s.Client.Subscribe("some.subject", func(msg *Message) {})
 	c.Assert(sub2, Equals, 2)
 }
 
@@ -71,7 +71,7 @@ func (s *YSuite) TestClientUnsubscribe(c *C) {
 	payload1 := make(chan string)
 	payload2 := make(chan string)
 
-	sid1 := s.Client.Subscribe("some.subject", func(msg *Message) {
+	sid1, _ := s.Client.Subscribe("some.subject", func(msg *Message) {
 		payload1 <- msg.Payload
 	})
 
@@ -95,6 +95,65 @@ func (s *YSuite) TestClientUnsubscribe(c *C) {
 	}
 
 	waitReceive(c, "hello!", payload2, 500)
+}
+
+func (s *YSuite) TestClientUnsubscribeInvalid(c *C) {
+	s.Client.Connect("foo", "bar")
+
+	err := s.Client.Unsubscribe(42)
+
+	c.Assert(err, Not(Equals), nil)
+	c.Assert(err.Error(), Equals, "Invalid Subject-Identifier (sid), no subscriber registered")
+}
+
+func (s *YSuite) TestClientSubscribeAndUnsubscribe(c *C) {
+	s.Client.Connect("foo", "bar")
+
+	payload := make(chan string)
+
+	sid1, _ := s.Client.Subscribe("some.subject", func(msg *Message) {
+		payload <- msg.Payload
+	})
+
+	s.Client.Publish("some.subject", "hello!")
+
+	waitReceive(c, "hello!", payload, 500)
+
+	s.Client.Unsubscribe(sid1)
+
+	s.Client.Subscribe("some.subject", func(msg *Message) {
+		payload <- msg.Payload
+	})
+
+	s.Client.Publish("some.subject", "hello!")
+
+	waitReceive(c, "hello!", payload, 500)
+
+	select {
+	case <-payload:
+		c.Error("Should not have received message.")
+	case <-time.After(500 * time.Millisecond):
+	}
+}
+
+func (s *YSuite) TestClientPublishTooBig(c *C) {
+	s.Client.Connect("foo", "bar")
+
+	payload := make([]byte, 10240000)
+	err := s.Client.Publish("foo", string(payload))
+
+	c.Assert(err, Not(Equals), nil)
+	c.Assert(err.Error(), Equals, "Payload size exceeded")
+}
+
+func (s *YSuite) TestClientSubscribeInvalidSubject(c *C) {
+	s.Client.Connect("foo", "bar")
+
+	sid, err := s.Client.Subscribe(">.a", func(msg *Message) {})
+
+	c.Assert(err, Not(Equals), nil)
+	c.Assert(err.Error(), Equals, "Invalid Subject")
+	c.Assert(sid, Equals, -1)
 }
 
 func (s *YSuite) TestClientUnsubscribeAll(c *C) {
