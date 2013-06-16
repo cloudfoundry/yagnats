@@ -8,10 +8,10 @@ import (
 )
 
 func main() {
-  c := make(chan os.Signal, 1)
-  signal.Notify(c, os.Interrupt)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
 
-  log.Printf("Sending messages...\n")
+	log.Printf("Sending messages...\n")
 
 	client := yagnats.NewClient()
 	err := client.Connect("127.0.0.1:4222", "nats", "nats")
@@ -31,6 +31,6 @@ func main() {
 		}
 	}()
 
-  <-c
-  log.Printf("Messages processed: %d\n", seen)
+	<-c
+	log.Printf("Messages processed: %d\n", seen)
 }
