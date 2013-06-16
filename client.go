@@ -2,6 +2,7 @@ package yagnats
 
 import (
 	"fmt"
+	"time"
 )
 
 type Callback func(*Message)
@@ -9,6 +10,7 @@ type Callback func(*Message)
 type Client struct {
 	connection    chan *Connection
 	subscriptions map[int]*Subscription
+	disconnecting bool
 }
 
 type Message struct {
@@ -46,6 +48,16 @@ func (c *Client) Connect(addr, user, pass string) error {
 	go c.dispatchMessages()
 
 	return nil
+}
+
+func (c *Client) Disconnect() {
+	if c.disconnecting {
+		return
+	}
+
+	conn := <-c.connection
+	c.disconnecting = true
+	conn.Disconnect()
 }
 
 func (c *Client) Publish(subject, payload string) error {
@@ -124,13 +136,11 @@ func (c *Client) connect(addr, user, pass string) (conn *Connection, err error) 
 
 	err = conn.Dial()
 	if err != nil {
-		fmt.Printf("Dial failed!\n")
 		return
 	}
 
 	err = conn.Handshake()
 	if err != nil {
-		fmt.Printf("Handshake failed!\n")
 		return
 	}
 
@@ -151,6 +161,11 @@ func (c *Client) serveConnections(conn *Connection, addr, user, pass string) {
 			}
 		}
 
+		// stop if client was told to disconnect
+		if c.disconnecting {
+			return
+		}
+
 		// acquire new connection
 		for {
 			conn, err = c.connect(addr, user, pass)
@@ -159,7 +174,7 @@ func (c *Client) serveConnections(conn *Connection, addr, user, pass string) {
 				break
 			}
 
-			// TODO: add small sleep to prevent thrashing?
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }

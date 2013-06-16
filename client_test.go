@@ -2,6 +2,7 @@ package yagnats
 
 import (
 	. "launchpad.net/gocheck"
+	"os/exec"
 	"testing"
 	"time"
 )
@@ -9,14 +10,19 @@ import (
 func Test(t *testing.T) { TestingT(t) }
 
 type YSuite struct {
-	Client *Client
+	Client  *Client
+	NatsCmd *exec.Cmd
 }
 
 var _ = Suite(&YSuite{})
 
 func (s *YSuite) SetUpSuite(c *C) {
-	startNats(4223)
+	s.NatsCmd = startNats(4223)
 	waitUntilNatsUp(4223)
+}
+
+func (s *YSuite) TearDownSuite(c *C) {
+	stopNats(s.NatsCmd)
 }
 
 func (s *YSuite) SetUpTest(c *C) {
@@ -28,7 +34,7 @@ func (s *YSuite) SetUpTest(c *C) {
 }
 
 func (s *YSuite) TearDownTest(c *C) {
-	//s.Client.Disconnect()
+	s.Client.Disconnect()
 	s.Client = nil
 }
 
@@ -204,6 +210,26 @@ func (s *YSuite) TestClientPublishWithReply(c *C) {
 	s.Client.PublishWithReplyTo("some.request", "hello!", "some.reply")
 
 	waitReceive(c, "response!", payload, 500)
+}
+
+func (s *YSuite) TestClientDisconnect(c *C) {
+	payload := make(chan string)
+
+	s.Client.Subscribe("some.subject", func(msg *Message) {
+		payload <- msg.Payload
+	})
+
+	s.Client.Disconnect()
+
+	otherClient := NewClient()
+	otherClient.Connect("127.0.0.1:4223", "nats", "nats")
+	otherClient.Publish("some.subject", "hello!")
+
+	select {
+	case <-payload:
+		c.Error("Should not have received message.")
+	case <-time.After(500 * time.Millisecond):
+	}
 }
 
 func waitReceive(c *C, expected string, from chan string, ms time.Duration) {

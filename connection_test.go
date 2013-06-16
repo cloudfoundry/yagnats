@@ -2,6 +2,7 @@ package yagnats
 
 import (
 	"bytes"
+	"errors"
 	. "launchpad.net/gocheck"
 	"net"
 	"time"
@@ -31,22 +32,51 @@ func (s *CSuite) TestConnectionPong(c *C) {
 	waitReceive(c, "PONG\r\n", conn.WriteChan, 500)
 }
 
+func (s *CSuite) TestConnectionDisconnect(c *C) {
+	conn := &fakeConn{
+		Buffer:    bytes.NewBuffer([]byte{}),
+		Received:  bytes.NewBuffer([]byte{}),
+		WriteChan: make(chan string),
+		Closed:    false,
+	}
+
+	s.Connection = &Connection{}
+
+	// fill in a fake connection
+	s.Connection.conn = conn
+	go s.Connection.receivePackets()
+
+	s.Connection.Disconnect()
+
+	c.Assert(conn.Closed, Equals, true)
+}
+
 type fakeConn struct {
 	Buffer    *bytes.Buffer
 	Received  *bytes.Buffer
 	WriteChan chan string
+	Closed    bool
 }
 
 func (f *fakeConn) Read(b []byte) (n int, err error) {
+	if f.Closed {
+		return 0, errors.New("buffer closed")
+	}
+
 	return f.Buffer.Read(b)
 }
 
 func (f *fakeConn) Write(b []byte) (n int, err error) {
+	if f.Closed {
+		return 0, errors.New("buffer closed")
+	}
+
 	f.WriteChan <- string(b)
 	return f.Received.Write(b)
 }
 
 func (f *fakeConn) Close() error {
+	f.Closed = true
 	return nil
 }
 

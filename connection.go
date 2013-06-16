@@ -63,6 +63,10 @@ func (c *Connection) Handshake() error {
 	}
 }
 
+func (c *Connection) Disconnect() {
+	c.conn.Close()
+}
+
 func (c *Connection) ErrOrOK() error {
 	select {
 	case err := <-c.Errs:
