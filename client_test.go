@@ -133,6 +133,29 @@ func (s *YSuite) TestClientSubscribeAndUnsubscribe(c *C) {
 	}
 }
 
+func (s *YSuite) TestClientAutoResubscribe(c *C) {
+	doomedNats := startNats(4213)
+	defer stopNats(doomedNats)
+
+	durableClient := NewClient()
+	durableClient.Connect("127.0.0.1:4213", "nats", "nats")
+
+	payload := make(chan string)
+
+	durableClient.Subscribe("some.subject", func(msg *Message) {
+		payload <- msg.Payload
+	})
+
+	stopNats(doomedNats)
+	waitUntilNatsDown(4213)
+	doomedNats = startNats(4213)
+	waitUntilNatsUp(4213)
+
+	durableClient.Publish("some.subject", "hello!")
+
+	waitReceive(c, "hello!", payload, 500)
+}
+
 func (s *YSuite) TestClientPublishTooBig(c *C) {
 	payload := make([]byte, 10240000)
 	err := s.Client.Publish("foo", string(payload))

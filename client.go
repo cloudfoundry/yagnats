@@ -170,13 +170,33 @@ func (c *Client) serveConnections(conn *Connection, addr, user, pass string) {
 		for {
 			conn, err = c.connect(addr, user, pass)
 			if err == nil {
-				// TODO: resubscribe/etc.
+				c.resubscribe()
 				break
 			}
 
 			time.Sleep(500 * time.Millisecond)
 		}
 	}
+}
+
+func (c *Client) resubscribe() error {
+	conn := <-c.connection
+
+	for id, sub := range c.subscriptions {
+		conn.Send(
+			&SubPacket{
+				Subject: sub.Subject,
+				ID:      id,
+			},
+		)
+
+		err := conn.ErrOrOK()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *Client) dispatchMessages() {
