@@ -16,13 +16,19 @@ type Client struct {
 	oks   chan *OKPacket
 	errs  chan *ERRPacket
 
-	subscriptions map[int]Callback
+	subscriptions map[int]*Subscription
 }
 
 type Message struct {
 	Subject string
 	Payload string
 	ReplyTo string
+}
+
+type Subscription struct {
+	Subject  string
+	Callback Callback
+	ID       int
 }
 
 func Dial(addr string) (client *Client, err error) {
@@ -36,7 +42,7 @@ func Dial(addr string) (client *Client, err error) {
 		pongs:         make(chan *PongPacket),
 		oks:           make(chan *OKPacket),
 		errs:          make(chan *ERRPacket),
-		subscriptions: make(map[int]Callback),
+		subscriptions: make(map[int]*Subscription),
 	}
 
 	go client.writePackets(conn)
@@ -70,9 +76,14 @@ func (c *Client) Publish(subject, payload string) {
 	)
 }
 
-func (c *Client) Subscribe(subject string, callback Callback) {
-	id := len(c.subscriptions)
-	c.subscriptions[id] = callback
+func (c *Client) Subscribe(subject string, callback Callback) int {
+	id := len(c.subscriptions) + 1
+
+	c.subscriptions[id] = &Subscription{
+		Subject:  subject,
+		ID:       id,
+		Callback: callback,
+	}
 
 	c.sendPacket(
 		&SubPacket{
@@ -80,6 +91,21 @@ func (c *Client) Subscribe(subject string, callback Callback) {
 			ID:      id,
 		},
 	)
+
+	return id
+}
+
+func (c *Client) UnsubscribeAll(subject string) {
+	for id, sub := range c.subscriptions {
+		if sub.Subject == subject {
+			c.Unsubscribe(id)
+		}
+	}
+}
+
+func (c *Client) Unsubscribe(sid int) {
+	c.sendPacket(&UnsubPacket{ID: sid})
+	delete(c.subscriptions, sid)
 }
 
 func (c *Client) sendPacket(packet Packet) {
@@ -132,7 +158,13 @@ func (c *Client) handlePackets(io *bufio.Reader) {
 		case *InfoPacket:
 		case *MsgPacket:
 			msg := packet.(*MsgPacket)
-			c.subscriptions[msg.SubID](
+			sub := c.subscriptions[msg.SubID]
+			if sub == nil {
+				fmt.Printf("Warning: Message for unknown subscription (%s, %d): %#v\n", msg.Subject, msg.SubID, msg)
+				break
+			}
+
+			sub.Callback(
 				&Message{
 					Subject: msg.Subject,
 					Payload: msg.Payload,

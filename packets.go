@@ -78,6 +78,14 @@ func (p *SubPacket) Encode() []byte {
 	}
 }
 
+type UnsubPacket struct {
+	ID int
+}
+
+func (p *UnsubPacket) Encode() []byte {
+	return []byte(fmt.Sprintf("UNSUB %d\r\n", p.ID))
+}
+
 type PubPacket struct {
 	Subject string
 	ReplyTo string

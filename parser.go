@@ -81,9 +81,9 @@ func Parse(io *bufio.Reader) (val Packet, err error) {
 }
 
 func readWord(io *bufio.Reader) ([]byte, error) {
-	length := wordEnd(io)
-	if length == 0 {
-		return nil, errors.New("No header!")
+	length, err := wordEnd(io)
+	if err != nil {
+		return nil, err
 	}
 
 	word := make([]byte, length)
@@ -92,25 +92,23 @@ func readWord(io *bufio.Reader) ([]byte, error) {
 	return word, nil
 }
 
-func wordEnd(io *bufio.Reader) int {
+func wordEnd(io *bufio.Reader) (int, error) {
 	length := 0
 
 	for {
 		next, err := io.Peek(length + 1)
 		if err != nil {
-			// TODO: handle this better; ideally we just do a blocking read or
-			// something instead of peeking anyway
-			return 0
+			return length, err
 		}
 
 		switch next[length] {
 		case ' ', '\r', '\t', '\n':
-			return length
+			return length, nil
 
 		default:
 			length += 1
 		}
 	}
 
-	return length
+	return length, nil
 }

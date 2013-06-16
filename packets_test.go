@@ -61,6 +61,11 @@ func (s *YSuite) TestSubEncode(c *C) {
 	c.Assert(string(packet.Encode()), Equals, "SUB some.subject some.queue 42\r\n")
 }
 
+func (s *YSuite) TestUnsubEncode(c *C) {
+	packet := &UnsubPacket{ID: 42}
+	c.Assert(string(packet.Encode()), Equals, "UNSUB 42\r\n")
+}
+
 func (s *YSuite) TestSubEncodeWithNoQueue(c *C) {
 	packet := &SubPacket{Subject: "some.subject", ID: 42}
 	c.Assert(string(packet.Encode()), Equals, "SUB some.subject 42\r\n")
