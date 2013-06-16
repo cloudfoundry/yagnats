@@ -2,6 +2,7 @@ package yagnats
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"regexp"
@@ -81,34 +82,20 @@ func Parse(io *bufio.Reader) (val Packet, err error) {
 }
 
 func readWord(io *bufio.Reader) ([]byte, error) {
-	length, err := wordEnd(io)
-	if err != nil {
-		return nil, err
-	}
-
-	word := make([]byte, length)
-	io.Read(word)
-
-	return word, nil
-}
-
-func wordEnd(io *bufio.Reader) (int, error) {
-	length := 0
+	word := new(bytes.Buffer)
 
 	for {
-		next, err := io.Peek(length + 1)
+		next, err := io.ReadByte()
 		if err != nil {
-			return length, err
+			return nil, err
 		}
 
-		switch next[length] {
-		case ' ', '\r', '\t', '\n':
-			return length, nil
+		switch next {
+		case ' ', '\t', '\r', '\n':
+			return word.Bytes(), nil
 
 		default:
-			length += 1
+			word.WriteByte(next)
 		}
 	}
-
-	return length, nil
 }
