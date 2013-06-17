@@ -170,7 +170,7 @@ func (c *Client) serveConnections(conn *Connection, addr, user, pass string) {
 		for {
 			conn, err = c.connect(addr, user, pass)
 			if err == nil {
-				c.resubscribe()
+				c.resubscribe(conn)
 				break
 			}
 
@@ -179,9 +179,7 @@ func (c *Client) serveConnections(conn *Connection, addr, user, pass string) {
 	}
 }
 
-func (c *Client) resubscribe() error {
-	conn := <-c.connection
-
+func (c *Client) resubscribe(conn *Connection) error {
 	for id, sub := range c.subscriptions {
 		conn.Send(
 			&SubPacket{
@@ -202,7 +200,10 @@ func (c *Client) resubscribe() error {
 func (c *Client) dispatchMessages() {
 	for {
 		conn := <-c.connection
-		msg := <-conn.MSGs
+		msg, ok := <-conn.MSGs
+		if !ok {
+			continue
+		}
 
 		sub := c.subscriptions[msg.SubID]
 		if sub == nil {

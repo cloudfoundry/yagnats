@@ -82,10 +82,16 @@ func (c *Connection) Send(packet Packet) {
 
 	_, err := c.conn.Write(packet.Encode())
 	if err != nil {
-		c.Disconnected <- true
+		c.disconnected()
 	}
 
 	return
+}
+
+func (c *Connection) disconnected() {
+	c.Disconnected <- true
+	close(c.MSGs)
+	close(c.PONGs)
 }
 
 func (c *Connection) receivePackets() {
@@ -94,7 +100,7 @@ func (c *Connection) receivePackets() {
 	for {
 		packet, err := Parse(io)
 		if err != nil {
-			c.Disconnected <- true
+			c.disconnected()
 			break
 		}
 
