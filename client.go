@@ -1,7 +1,6 @@
 package yagnats
 
 import (
-	"fmt"
 	"time"
 )
 
