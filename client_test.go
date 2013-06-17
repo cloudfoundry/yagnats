@@ -255,6 +255,27 @@ func (s *YSuite) TestClientDisconnect(c *C) {
 	}
 }
 
+func (s *YSuite) TestClientInvalidMessage(c *C) {
+	payload := make(chan string)
+
+	sid, err := s.Client.Subscribe("some.subject", func(msg *Message) {
+		payload <- msg.Payload
+	})
+
+	s.Client.Subscribe("some.other.subject", func(msg *Message) {
+		payload <- msg.Payload
+	})
+
+	c.Assert(err, Equals, nil)
+
+	delete(s.Client.subscriptions, sid)
+
+	s.Client.Publish("some.subject", "hello!")
+	s.Client.Publish("some.other.subject", "hello to other!")
+
+	waitReceive(c, "hello to other!", payload, 500)
+}
+
 func waitReceive(c *C, expected string, from chan string, ms time.Duration) {
 	select {
 	case msg := <-from:

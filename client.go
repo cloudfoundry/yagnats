@@ -207,8 +207,7 @@ func (c *Client) dispatchMessages() {
 
 		sub := c.subscriptions[msg.SubID]
 		if sub == nil {
-			fmt.Printf("Warning: Message for unknown subscription (%s, %d): %#v\n", msg.Subject, msg.SubID, msg)
-			break
+			continue
 		}
 
 		go sub.Callback(
