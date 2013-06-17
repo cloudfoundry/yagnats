@@ -54,8 +54,12 @@ var PARSERS = map[string]Parser{
 
 		subID, _ := strconv.Atoi(matches[2])
 		payloadLen, _ := strconv.Atoi(matches[5])
-		payload := make([]byte, payloadLen)
-		io.Read(payload)
+
+		payload, err := readNBytes(payloadLen, io)
+		if err != nil {
+			return nil, err
+		}
+
 		io.ReadBytes('\n')
 
 		return &MsgPacket{
@@ -98,4 +102,19 @@ func readWord(io *bufio.Reader) ([]byte, error) {
 			word.WriteByte(next)
 		}
 	}
+}
+
+func readNBytes(payloadLen int, io *bufio.Reader) ([]byte, error) {
+	payload := make([]byte, payloadLen)
+
+	for readCount := 0; readCount < payloadLen; {
+		n, err := io.Read(payload[readCount:])
+		if err != nil {
+			return nil, err
+		}
+
+		readCount += n
+	}
+
+	return payload, nil
 }
