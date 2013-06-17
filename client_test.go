@@ -2,6 +2,7 @@ package yagnats
 
 import (
 	. "launchpad.net/gocheck"
+	"net"
 	"os/exec"
 	"testing"
 	"time"
@@ -57,7 +58,44 @@ func (s *YSuite) TestClientConnectWithInvalidAuth(c *C) {
 }
 
 func (s *YSuite) TestClientPing(c *C) {
-	c.Assert(s.Client.Ping(), Equals, &PongPacket{})
+	c.Assert(s.Client.Ping(), Equals, true)
+}
+
+func (s *YSuite) TestClientPingWhenNotConnected(c *C) {
+	disconnectedClient := NewClient()
+	c.Assert(disconnectedClient.Ping(), Equals, false)
+}
+
+func (s *YSuite) TestClientPingWhenConnectionClosed(c *C) {
+	conn := <-s.Client.connection
+	conn.Disconnect()
+	c.Assert(s.Client.Ping(), Equals, false)
+}
+
+func (s *YSuite) TestClientPingWhenResponseIsTooSlow(c *C) {
+	fakeConn := NewConnection("127.0.0.1:4223", "nats", "nats")
+
+	conn, err := net.Dial("tcp", "127.0.0.1:4223")
+	if err != nil {
+		c.Error("Could not dial")
+	}
+
+	fakeConn.conn = conn
+
+	disconnectedClient := NewClient()
+
+	go func() {
+		for {
+			disconnectedClient.connection <- fakeConn
+		}
+	}()
+
+	go func() {
+		time.Sleep(1 * time.Second)
+		fakeConn.PONGs <- &PongPacket{}
+	}()
+
+	c.Assert(disconnectedClient.Ping(), Equals, false)
 }
 
 func (s *YSuite) TestClientSubscribe(c *C) {
@@ -149,6 +187,8 @@ func (s *YSuite) TestClientAutoResubscribe(c *C) {
 	stopNats(doomedNats)
 	waitUntilNatsDown(4213)
 	doomedNats = startNats(4213)
+	defer stopNats(doomedNats)
+
 	waitUntilNatsUp(4213)
 
 	durableClient.Publish("some.subject", "hello!")

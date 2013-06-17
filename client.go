@@ -31,10 +31,20 @@ func NewClient() *Client {
 	}
 }
 
-func (c *Client) Ping() *PongPacket {
-	conn := <-c.connection
-	conn.Send(&PingPacket{})
-	return <-conn.PONGs
+func (c *Client) Ping() bool {
+	select {
+	case conn := <-c.connection:
+		conn.Send(&PingPacket{})
+
+		select {
+		case _, ok := <-conn.PONGs:
+			return ok
+		case <-time.After(500 * time.Millisecond):
+			return false
+		}
+	case <-time.After(500 * time.Millisecond):
+		return false
+	}
 }
 
 func (c *Client) Connect(addr, user, pass string) error {

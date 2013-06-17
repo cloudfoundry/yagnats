@@ -54,13 +54,7 @@ func (c *Connection) Dial() error {
 
 func (c *Connection) Handshake() error {
 	c.Send(&ConnectPacket{User: c.user, Pass: c.pass})
-
-	select {
-	case <-c.OKs:
-		return nil
-	case err := <-c.Errs:
-		return err
-	}
+	return c.ErrOrOK()
 }
 
 func (c *Connection) Disconnect() {
