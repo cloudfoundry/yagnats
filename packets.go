@@ -83,6 +83,7 @@ func (p *SubPacket) Encode() []byte {
 	} else {
 		return []byte(fmt.Sprintf("SUB %s %d\r\n", p.Subject, p.ID))
 	}
+	return nil
 }
 
 type UnsubPacket struct {
@@ -101,20 +102,11 @@ type PubPacket struct {
 
 func (p *PubPacket) Encode() []byte {
 	if p.ReplyTo != "" {
-		return []byte(
-			fmt.Sprintf(
-				"PUB %s %s %d\r\n%s\r\n",
-				p.Subject, p.ReplyTo, len(p.Payload), p.Payload,
-			),
-		)
+		return []byte(fmt.Sprintf("PUB %s %s %d\r\n%s\r\n", p.Subject, p.ReplyTo, len(p.Payload), p.Payload))
 	} else {
-		return []byte(
-			fmt.Sprintf(
-				"PUB %s %d\r\n%s\r\n",
-				p.Subject, len(p.Payload), p.Payload,
-			),
-		)
+		return []byte(fmt.Sprintf("PUB %s %d\r\n%s\r\n", p.Subject, len(p.Payload), p.Payload))
 	}
+	return nil
 }
 
 type MsgPacket struct {
@@ -126,18 +118,9 @@ type MsgPacket struct {
 
 func (p *MsgPacket) Encode() []byte {
 	if p.ReplyTo != "" {
-		return []byte(
-			fmt.Sprintf(
-				"MSG %s %d %s %d\r\n%s\r\n",
-				p.Subject, p.SubID, p.ReplyTo, len(p.Payload), p.Payload,
-			),
-		)
+		return []byte(fmt.Sprintf("MSG %s %d %s %d\r\n%s\r\n", p.Subject, p.SubID, p.ReplyTo, len(p.Payload), p.Payload))
 	} else {
-		return []byte(
-			fmt.Sprintf(
-				"MSG %s %d %d\r\n%s\r\n",
-				p.Subject, p.SubID, len(p.Payload), p.Payload,
-			),
-		)
+		return []byte(fmt.Sprintf("MSG %s %d %d\r\n%s\r\n", p.Subject, p.SubID, len(p.Payload), p.Payload))
 	}
+	return nil
 }

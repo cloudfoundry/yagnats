@@ -102,6 +102,7 @@ func readWord(io *bufio.Reader) ([]byte, error) {
 			word.WriteByte(next)
 		}
 	}
+	return nil, nil
 }
 
 func readNBytes(payloadLen int, io *bufio.Reader) ([]byte, error) {

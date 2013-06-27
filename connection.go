@@ -68,6 +68,7 @@ func (c *Connection) ErrOrOK() error {
 	case <-c.OKs:
 		return nil
 	}
+	return nil
 }
 
 func (c *Connection) Send(packet Packet) {
