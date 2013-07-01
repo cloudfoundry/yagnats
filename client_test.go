@@ -23,7 +23,7 @@ func (s *YSuite) SetUpSuite(c *C) {
 }
 
 func (s *YSuite) TearDownSuite(c *C) {
-	stopNats(s.NatsCmd)
+	stopCmd(s.NatsCmd)
 }
 
 func (s *YSuite) SetUpTest(c *C) {
@@ -173,7 +173,7 @@ func (s *YSuite) TestClientSubscribeAndUnsubscribe(c *C) {
 
 func (s *YSuite) TestClientAutoResubscribe(c *C) {
 	doomedNats := startNats(4213)
-	defer stopNats(doomedNats)
+	defer stopCmd(doomedNats)
 
 	durableClient := NewClient()
 	durableClient.Connect("127.0.0.1:4213", "nats", "nats")
@@ -184,10 +184,10 @@ func (s *YSuite) TestClientAutoResubscribe(c *C) {
 		payload <- msg.Payload
 	})
 
-	stopNats(doomedNats)
+	stopCmd(doomedNats)
 	waitUntilNatsDown(4213)
 	doomedNats = startNats(4213)
-	defer stopNats(doomedNats)
+	defer stopCmd(doomedNats)
 
 	waitUntilNatsUp(4213)
 

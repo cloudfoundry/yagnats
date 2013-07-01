@@ -33,9 +33,14 @@ func NewConnection(addr, user, pass string) *Connection {
 		PONGs: make(chan *PongPacket),
 		OKs:   make(chan *OKPacket),
 		MSGs:  make(chan *MsgPacket),
-		Errs:  make(chan error),
 
-		Disconnected: make(chan bool),
+		// buffer size of 1 to account for fatal unexpected errors
+		// from the server (i.e. slow consumer)
+		Errs:  make(chan error, 1),
+
+		// buffer size of 1 so that read and write errors
+		// can both send without blocking
+		Disconnected: make(chan bool, 1),
 	}
 }
 
@@ -84,6 +89,9 @@ func (c *Connection) Send(packet Packet) {
 
 func (c *Connection) disconnected() {
 	c.Disconnected <- true
+}
+
+func (c *Connection) Close() {
 	close(c.MSGs)
 	close(c.PONGs)
 }

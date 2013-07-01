@@ -164,6 +164,7 @@ func (c *Client) serveConnections(conn *Connection, addr, user, pass string) {
 		for stop := false; !stop; {
 			select {
 			case <-conn.Disconnected:
+				conn.Close()
 				stop = true
 
 			case c.connection <- conn:

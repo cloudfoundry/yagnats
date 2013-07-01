@@ -22,7 +22,16 @@ func startNats(port int) *exec.Cmd {
 	return cmd
 }
 
-func stopNats(cmd *exec.Cmd) {
+func startProducer() *exec.Cmd {
+	cmd := exec.Command("go", "run", "examples/fast-producer.go")
+	err := cmd.Start()
+	if err != nil {
+		fmt.Printf("Producer failed to start: %v\n", err)
+	}
+	return cmd
+}
+
+func stopCmd(cmd *exec.Cmd) {
 	cmd.Process.Kill()
 	cmd.Wait()
 }

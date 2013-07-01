@@ -14,6 +14,10 @@ type CSuite struct {
 
 var _ = Suite(&CSuite{})
 
+func (s *CSuite) SetUpTest(c *C) {
+	s.Connection = NewConnection("foo", "bar", "baz")
+}
+
 func (s *CSuite) TestConnectionPong(c *C) {
 	conn := &fakeConn{
 		Buffer:    bytes.NewBuffer([]byte("PING\r\n")),
@@ -21,7 +25,21 @@ func (s *CSuite) TestConnectionPong(c *C) {
 		WriteChan: make(chan string),
 	}
 
-	s.Connection = &Connection{}
+	// fill in a fake connection
+	s.Connection.conn = conn
+	go s.Connection.receivePackets()
+
+	time.Sleep(1 * time.Second)
+
+	waitReceive(c, "PONG\r\n", conn.WriteChan, 500)
+}
+
+func (s *CSuite) TestConnectionUnexpectedError(c *C) {
+	conn := &fakeConn{
+		Buffer:    bytes.NewBuffer([]byte("-ERR 'foo'\r\nPING\r\n")),
+		Received:  bytes.NewBuffer([]byte{}),
+		WriteChan: make(chan string),
+	}
 
 	// fill in a fake connection
 	s.Connection.conn = conn
@@ -39,8 +57,6 @@ func (s *CSuite) TestConnectionDisconnect(c *C) {
 		WriteChan: make(chan string),
 		Closed:    false,
 	}
-
-	s.Connection = &Connection{}
 
 	// fill in a fake connection
 	s.Connection.conn = conn
