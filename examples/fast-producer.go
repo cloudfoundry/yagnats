@@ -1,7 +1,7 @@
 package main
 
 import (
-	yagnats "../" //github.com/vito/yagnats"
+	yagnats "../"
 	"log"
 	"os"
 	"os/signal"
