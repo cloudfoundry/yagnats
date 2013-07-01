@@ -36,7 +36,7 @@ func NewConnection(addr, user, pass string) *Connection {
 
 		// buffer size of 1 to account for fatal unexpected errors
 		// from the server (i.e. slow consumer)
-		Errs:  make(chan error, 1),
+		Errs: make(chan error, 1),
 
 		// buffer size of 1 so that read and write errors
 		// can both send without blocking

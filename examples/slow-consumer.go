@@ -2,10 +2,10 @@ package main
 
 import (
 	yagnats "../"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"fmt"
 )
 
 func main() {
