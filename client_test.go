@@ -196,6 +196,49 @@ func (s *YSuite) TestClientAutoResubscribe(c *C) {
 	waitReceive(c, "hello!", payload, 500)
 }
 
+func (s *YSuite) TestClientConnectCallback(c *C) {
+	doomedNats := startNats(4213)
+	defer stopCmd(doomedNats)
+
+	connectionChannel := make(chan string)
+
+	newClient := NewClient()
+	newClient.ConnectedCallback = func() {
+		connectionChannel <- "yo"
+	}
+
+	newClient.Connect("127.0.0.1:4213", "nats", "nats")
+
+	waitReceive(c, "yo", connectionChannel, 500)
+}
+
+func (s *YSuite) TestClientReconnectCallback(c *C) {
+	doomedNats := startNats(4213)
+	defer stopCmd(doomedNats)
+
+	connectionChannel := make(chan string)
+
+	durableClient := NewClient()
+	durableClient.ConnectedCallback = func() {
+		connectionChannel <- "yo"
+	}
+
+	durableClient.Connect("127.0.0.1:4213", "nats", "nats")
+
+	waitReceive(c, "yo", connectionChannel, 500)
+
+	stopCmd(doomedNats)
+	err := waitUntilNatsDown(4213)
+	c.Assert(err, IsNil)
+
+	doomedNats = startNats(4213)
+	defer stopCmd(doomedNats)
+
+	waitUntilNatsUp(4213)
+
+	waitReceive(c, "yo", connectionChannel, 500)
+}
+
 func (s *YSuite) TestClientPublishTooBig(c *C) {
 	payload := make([]byte, 10240000)
 	err := s.Client.Publish("foo", string(payload))

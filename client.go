@@ -10,6 +10,8 @@ type Client struct {
 	connection    chan *Connection
 	subscriptions map[int]*Subscription
 	disconnecting bool
+
+	ConnectedCallback func()
 }
 
 type Message struct {
@@ -151,6 +153,10 @@ func (c *Client) connect(addr, user, pass string) (conn *Connection, err error) 
 	err = conn.Handshake()
 	if err != nil {
 		return
+	}
+
+	if c.ConnectedCallback != nil {
+		go c.ConnectedCallback()
 	}
 
 	return
