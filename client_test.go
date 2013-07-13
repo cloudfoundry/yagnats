@@ -359,6 +359,24 @@ func (s *YSuite) TestClientInvalidMessage(c *C) {
 	waitReceive(c, "hello to other!", payload, 500)
 }
 
+func (s *YSuite) TestClientLogging(c *C) {
+  logger := &DefaultLogger{}
+  s.Client.Logger = logger
+  c.Assert(s.Client.Logger, Equals, logger)
+}
+
+func (s *YSuite) TestClientPassesLoggerToConnection(c *C) {
+  logger := &DefaultLogger{}
+
+	client := NewClient()
+	client.Logger = logger
+
+  conn, err := client.connect("127.0.0.1:4223", "nats", "nats")
+  c.Assert(err, IsNil)
+
+  c.Assert(conn.Logger, Equals, logger)
+}
+
 func waitReceive(c *C, expected string, from chan string, ms time.Duration) {
 	select {
 	case msg := <-from:

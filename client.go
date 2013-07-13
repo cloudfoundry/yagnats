@@ -12,6 +12,8 @@ type Client struct {
 	disconnecting bool
 
 	ConnectedCallback func()
+
+	Logger Logger
 }
 
 type Message struct {
@@ -30,6 +32,7 @@ func NewClient() *Client {
 	return &Client{
 		connection:    make(chan *Connection),
 		subscriptions: make(map[int]*Subscription),
+		Logger:        &DefaultLogger{},
 	}
 }
 
@@ -144,6 +147,7 @@ func (c *Client) UnsubscribeAll(subject string) {
 
 func (c *Client) connect(addr, user, pass string) (conn *Connection, err error) {
 	conn = NewConnection(addr, user, pass)
+	conn.Logger = c.Logger
 
 	err = conn.Dial()
 	if err != nil {
@@ -170,25 +174,34 @@ func (c *Client) serveConnections(conn *Connection, addr, user, pass string) {
 		for stop := false; !stop; {
 			select {
 			case <-conn.Disconnected:
+				c.Logger.Warn("client.connection.disconnected")
 				conn.Close()
 				stop = true
 
 			case c.connection <- conn:
+				c.Logger.Debug("client.connection.served")
 			}
 		}
 
 		// stop if client was told to disconnect
 		if c.disconnecting {
+			c.Logger.Info("client.disconnecting")
 			return
 		}
 
 		// acquire new connection
 		for {
+			c.Logger.Debug("client.reconnect.starting")
+
 			conn, err = c.connect(addr, user, pass)
 			if err == nil {
+				c.Logger.Debug("client.connection.resubscribing")
 				c.resubscribe(conn)
+				c.Logger.Debug("client.connection.resubscribed")
 				break
 			}
+
+			c.Logger.Warnd(map[string]interface{}{"error": err}, "client.reconnect.failed")
 
 			time.Sleep(500 * time.Millisecond)
 		}
