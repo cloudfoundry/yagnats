@@ -1,7 +1,7 @@
 package main
 
 import (
-	yagnats "../"
+	yagnats "github.com/cloudfoundry/yagnats"
 	"log"
 	"os"
 	"os/signal"
