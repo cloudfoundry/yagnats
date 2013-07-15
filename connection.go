@@ -75,7 +75,7 @@ func (c *Connection) ErrOrOK() error {
 
 	select {
 	case err := <-c.Errs:
-		c.Logger.Warnd(map[string]interface{}{"error": err}, "connection.err-or-ok.err")
+		c.Logger.Warnd(map[string]interface{}{"error": err.Error()}, "connection.err-or-ok.err")
 		return err
 	case <-c.OKs:
 		c.Logger.Debug("connection.err-or-ok.ok")
@@ -91,7 +91,7 @@ func (c *Connection) Send(packet Packet) {
 
 	_, err := c.conn.Write(packet.Encode())
 	if err != nil {
-		c.Logger.Errord(map[string]interface{}{"error": err}, "connection.packet.write-error")
+		c.Logger.Errord(map[string]interface{}{"error": err.Error()}, "connection.packet.write-error")
 		c.disconnected()
 	}
 
@@ -115,7 +115,7 @@ func (c *Connection) receivePackets() {
 
 		packet, err := Parse(io)
 		if err != nil {
-			c.Logger.Errord(map[string]interface{}{"error": err}, "connection.packet.read-error")
+			c.Logger.Errord(map[string]interface{}{"error": err.Error()}, "connection.packet.read-error")
 			c.disconnected()
 			break
 		}

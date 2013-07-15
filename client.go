@@ -201,7 +201,7 @@ func (c *Client) serveConnections(conn *Connection, addr, user, pass string) {
 				break
 			}
 
-			c.Logger.Warnd(map[string]interface{}{"error": err}, "client.reconnect.failed")
+			c.Logger.Warnd(map[string]interface{}{"error": err.Error()}, "client.reconnect.failed")
 
 			time.Sleep(500 * time.Millisecond)
 		}
