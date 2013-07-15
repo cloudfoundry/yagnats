@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"time"
 )
 
 type Connection struct {
@@ -98,6 +99,17 @@ func (c *Connection) Send(packet Packet) {
 	return
 }
 
+func (c *Connection) Ping() bool {
+	c.Send(&PingPacket{})
+
+	select {
+	case _, ok := <-c.PONGs:
+		return ok
+	case <-time.After(500 * time.Millisecond):
+		return false
+	}
+}
+
 func (c *Connection) disconnected() {
 	c.Disconnected <- true
 }
@@ -123,7 +135,13 @@ func (c *Connection) receivePackets() {
 		switch packet.(type) {
 		case *PongPacket:
 			c.Logger.Debug("connection.packet.pong-received")
-			c.PONGs <- packet.(*PongPacket)
+
+			select {
+			case c.PONGs <- packet.(*PongPacket):
+				c.Logger.Debug("connection.packet.pong-served")
+			default:
+				c.Logger.Debug("connection.packet.pong-unhandled")
+			}
 
 		case *PingPacket:
 			c.Logger.Debug("connection.packet.ping-received")

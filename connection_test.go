@@ -50,6 +50,22 @@ func (s *CSuite) TestConnectionUnexpectedError(c *C) {
 	waitReceive(c, "PONG\r\n", conn.WriteChan, 500)
 }
 
+func (s *CSuite) TestConnectionUnexpectedPong(c *C) {
+	conn := &fakeConn{
+		Buffer:    bytes.NewBuffer([]byte("PONG\r\nPING\r\n")),
+		Received:  bytes.NewBuffer([]byte{}),
+		WriteChan: make(chan string),
+	}
+
+	// fill in a fake connection
+	s.Connection.conn = conn
+	go s.Connection.receivePackets()
+
+	time.Sleep(1 * time.Second)
+
+	waitReceive(c, "PONG\r\n", conn.WriteChan, 500)
+}
+
 func (s *CSuite) TestConnectionDisconnect(c *C) {
 	conn := &fakeConn{
 		Buffer:    bytes.NewBuffer([]byte{}),

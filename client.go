@@ -39,14 +39,7 @@ func NewClient() *Client {
 func (c *Client) Ping() bool {
 	select {
 	case conn := <-c.connection:
-		conn.Send(&PingPacket{})
-
-		select {
-		case _, ok := <-conn.PONGs:
-			return ok
-		case <-time.After(500 * time.Millisecond):
-			return false
-		}
+		return conn.Ping()
 	case <-time.After(500 * time.Millisecond):
 		return false
 	}
