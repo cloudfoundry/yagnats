@@ -27,6 +27,10 @@ type Connection struct {
 	Logger Logger
 }
 
+type ConnectionProvider interface {
+	ProvideConnection() (*Connection, error)
+}
+
 func NewConnection(addr, user, pass string) *Connection {
 	return &Connection{
 		addr: addr,
@@ -47,6 +51,30 @@ func NewConnection(addr, user, pass string) *Connection {
 		// can both send without blocking
 		Disconnected: make(chan bool, 1),
 	}
+}
+
+type ConnectionInfo struct {
+	Addr     string
+	Username string
+	Password string
+}
+
+func (c *ConnectionInfo) ProvideConnection() (*Connection, error) {
+	conn := NewConnection(c.Addr, c.Username, c.Password)
+
+	var err error
+
+	err = conn.Dial()
+	if err != nil {
+		return nil, err
+	}
+
+	err = conn.Handshake()
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
 }
 
 func (c *Connection) Dial() error {

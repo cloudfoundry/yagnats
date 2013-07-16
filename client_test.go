@@ -29,7 +29,11 @@ func (s *YSuite) TearDownSuite(c *C) {
 func (s *YSuite) SetUpTest(c *C) {
 	client := NewClient()
 
-	client.Connect("127.0.0.1:4223", "nats", "nats")
+	client.Connect(&ConnectionInfo{
+		Addr:     "127.0.0.1:4223",
+		Username: "nats",
+		Password: "nats",
+	})
 
 	s.Client = client
 }
@@ -42,7 +46,7 @@ func (s *YSuite) TearDownTest(c *C) {
 func (s *YSuite) TestConnectWithInvalidAddress(c *C) {
 	badClient := NewClient()
 
-	err := badClient.Connect("", "cats", "bats")
+	err := badClient.Connect(&ConnectionInfo{Addr: ""})
 
 	c.Assert(err, Not(Equals), nil)
 	c.Assert(err.Error(), Equals, "dial tcp: missing address")
@@ -51,7 +55,11 @@ func (s *YSuite) TestConnectWithInvalidAddress(c *C) {
 func (s *YSuite) TestClientConnectWithInvalidAuth(c *C) {
 	badClient := NewClient()
 
-	err := badClient.Connect("127.0.0.1:4223", "cats", "bats")
+	err := badClient.Connect(&ConnectionInfo{
+		Addr:     "127.0.0.1:4223",
+		Username: "cats",
+		Password: "bats",
+	})
 
 	c.Assert(err, Not(Equals), nil)
 	c.Assert(err.Error(), Equals, "Authorization failed")
@@ -176,7 +184,11 @@ func (s *YSuite) TestClientAutoResubscribe(c *C) {
 	defer stopCmd(doomedNats)
 
 	durableClient := NewClient()
-	durableClient.Connect("127.0.0.1:4213", "nats", "nats")
+	durableClient.Connect(&ConnectionInfo{
+		Addr:     "127.0.0.1:4213",
+		Username: "nats",
+		Password: "nats",
+	})
 
 	payload := make(chan string)
 
@@ -207,7 +219,11 @@ func (s *YSuite) TestClientConnectCallback(c *C) {
 		connectionChannel <- "yo"
 	}
 
-	newClient.Connect("127.0.0.1:4213", "nats", "nats")
+	newClient.Connect(&ConnectionInfo{
+		Addr:     "127.0.0.1:4213",
+		Username: "nats",
+		Password: "nats",
+	})
 
 	waitReceive(c, "yo", connectionChannel, 500)
 }
@@ -223,7 +239,11 @@ func (s *YSuite) TestClientReconnectCallback(c *C) {
 		connectionChannel <- "yo"
 	}
 
-	durableClient.Connect("127.0.0.1:4213", "nats", "nats")
+	durableClient.Connect(&ConnectionInfo{
+		Addr:     "127.0.0.1:4213",
+		Username: "nats",
+		Password: "nats",
+	})
 
 	waitReceive(c, "yo", connectionChannel, 500)
 
@@ -328,7 +348,12 @@ func (s *YSuite) TestClientDisconnect(c *C) {
 	s.Client.Disconnect()
 
 	otherClient := NewClient()
-	otherClient.Connect("127.0.0.1:4223", "nats", "nats")
+	otherClient.Connect(&ConnectionInfo{
+		Addr:     "127.0.0.1:4223",
+		Username: "nats",
+		Password: "nats",
+	})
+
 	otherClient.Publish("some.subject", "hello!")
 
 	select {
@@ -338,7 +363,7 @@ func (s *YSuite) TestClientDisconnect(c *C) {
 	}
 }
 
-func (s *YSuite) TestClientInvalidMessage(c *C) {
+func (s *YSuite) TestClientMessageWithoutSubscription(c *C) {
 	payload := make(chan string)
 
 	sid, err := s.Client.Subscribe("some.subject", func(msg *Message) {
@@ -371,10 +396,40 @@ func (s *YSuite) TestClientPassesLoggerToConnection(c *C) {
 	client := NewClient()
 	client.Logger = logger
 
-	conn, err := client.connect("127.0.0.1:4223", "nats", "nats")
+	conn, err := client.connect(&ConnectionInfo{
+		Addr:     "127.0.0.1:4223",
+		Username: "nats",
+		Password: "nats",
+	})
+
 	c.Assert(err, IsNil)
 
 	c.Assert(conn.Logger, Equals, logger)
+}
+
+func (s *YSuite) TestClientMessageWhileResubscribing(c *C) {
+	client := NewClient()
+
+	client.Connect(&DisconnectingConnectionProvider{
+		ReadBuffers: []string{
+			// OK for foo sub, OK for bar sub
+			"+OK\r\n+OK\r\n",
+
+			// OK for foo resub, MSG to foo, OK for bar resub
+			"+OK\r\nMSG foo 1 5\r\nhello\r\n+OK\r\n",
+		},
+	})
+
+	payload := make(chan string)
+
+	client.Subscribe("foo", func(msg *Message) {
+		payload <- "resubscribed!"
+	})
+
+	client.Subscribe("bar", func(msg *Message) {
+	})
+
+	waitReceive(c, "resubscribed!", payload, 500)
 }
 
 func waitReceive(c *C, expected string, from chan string, ms time.Duration) {

@@ -45,13 +45,13 @@ func (c *Client) Ping() bool {
 	}
 }
 
-func (c *Client) Connect(addr, user, pass string) error {
-	conn, err := c.connect(addr, user, pass)
+func (c *Client) Connect(cp ConnectionProvider) error {
+	conn, err := c.connect(cp)
 	if err != nil {
 		return err
 	}
 
-	go c.serveConnections(conn, addr, user, pass)
+	go c.serveConnections(conn, cp)
 	go c.dispatchMessages()
 
 	return nil
@@ -138,19 +138,13 @@ func (c *Client) UnsubscribeAll(subject string) {
 	}
 }
 
-func (c *Client) connect(addr, user, pass string) (conn *Connection, err error) {
-	conn = NewConnection(addr, user, pass)
+func (c *Client) connect(cp ConnectionProvider) (conn *Connection, err error) {
+	conn, err = cp.ProvideConnection()
+	if err != nil {
+		return
+	}
+
 	conn.Logger = c.Logger
-
-	err = conn.Dial()
-	if err != nil {
-		return
-	}
-
-	err = conn.Handshake()
-	if err != nil {
-		return
-	}
 
 	if c.ConnectedCallback != nil {
 		go c.ConnectedCallback()
@@ -159,45 +153,44 @@ func (c *Client) connect(addr, user, pass string) (conn *Connection, err error) 
 	return
 }
 
-func (c *Client) serveConnections(conn *Connection, addr, user, pass string) {
+func (c *Client) serveConnections(conn *Connection, cp ConnectionProvider) {
 	var err error
 
+	// serve connection until disconnected
+	for stop := false; !stop; {
+		select {
+		case <-conn.Disconnected:
+			c.Logger.Warn("client.connection.disconnected")
+			conn.Close()
+			stop = true
+
+		case c.connection <- conn:
+			c.Logger.Debug("client.connection.served")
+		}
+	}
+
+	// stop if client was told to disconnect
+	if c.disconnecting {
+		c.Logger.Info("client.disconnecting")
+		return
+	}
+
+	// acquire new connection
 	for {
-		// serve connection until disconnected
-		for stop := false; !stop; {
-			select {
-			case <-conn.Disconnected:
-				c.Logger.Warn("client.connection.disconnected")
-				conn.Close()
-				stop = true
+		c.Logger.Debug("client.reconnect.starting")
 
-			case c.connection <- conn:
-				c.Logger.Debug("client.connection.served")
-			}
+		conn, err = c.connect(cp)
+		if err == nil {
+			go c.serveConnections(conn, cp)
+			c.Logger.Debug("client.connection.resubscribing")
+			c.resubscribe(conn)
+			c.Logger.Debug("client.connection.resubscribed")
+			break
 		}
 
-		// stop if client was told to disconnect
-		if c.disconnecting {
-			c.Logger.Info("client.disconnecting")
-			return
-		}
+		c.Logger.Warnd(map[string]interface{}{"error": err.Error()}, "client.reconnect.failed")
 
-		// acquire new connection
-		for {
-			c.Logger.Debug("client.reconnect.starting")
-
-			conn, err = c.connect(addr, user, pass)
-			if err == nil {
-				c.Logger.Debug("client.connection.resubscribing")
-				c.resubscribe(conn)
-				c.Logger.Debug("client.connection.resubscribed")
-				break
-			}
-
-			c.Logger.Warnd(map[string]interface{}{"error": err.Error()}, "client.reconnect.failed")
-
-			time.Sleep(500 * time.Millisecond)
-		}
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
