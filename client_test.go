@@ -1,6 +1,7 @@
 package yagnats
 
 import (
+	"fmt"
 	. "launchpad.net/gocheck"
 	"net"
 	"os/exec"
@@ -246,6 +247,46 @@ func (s *YSuite) TestClientReconnectCallback(c *C) {
 	})
 
 	waitReceive(c, "yo", connectionChannel, 500)
+
+	stopCmd(doomedNats)
+	err := waitUntilNatsDown(4213)
+	c.Assert(err, IsNil)
+
+	doomedNats = startNats(4213)
+	defer stopCmd(doomedNats)
+
+	waitUntilNatsUp(4213)
+
+	waitReceive(c, "yo", connectionChannel, 500)
+}
+
+func (s *YSuite) TestClientReconnectCallbackSelfPublish(c *C) {
+	doomedNats := startNats(4213)
+	defer stopCmd(doomedNats)
+
+	connectionChannel := make(chan string)
+
+	durableClient := NewClient()
+	durableClient.ConnectedCallback = func() {
+		durableClient.Publish("started", "hi")
+	}
+
+	durableClient.Connect(&ConnectionInfo{
+		Addr:     "127.0.0.1:4213",
+		Username: "nats",
+		Password: "nats",
+	})
+
+	// set up a bunch of subscriptions so resubscribing takes a while
+	for subid := 0; subid < 1000; subid += 1 {
+		durableClient.Subscribe(fmt.Sprintf("subscription.%d", subid), func(*Message) {
+			// nothing
+		})
+	}
+
+	durableClient.Subscribe("started", func(*Message) {
+		connectionChannel <- "yo"
+	})
 
 	stopCmd(doomedNats)
 	err := waitUntilNatsDown(4213)

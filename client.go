@@ -54,6 +54,10 @@ func (c *Client) Connect(cp ConnectionProvider) error {
 	go c.serveConnections(conn, cp)
 	go c.dispatchMessages()
 
+	if c.ConnectedCallback != nil {
+		go c.ConnectedCallback()
+	}
+
 	return nil
 }
 
@@ -146,10 +150,6 @@ func (c *Client) connect(cp ConnectionProvider) (conn *Connection, err error) {
 
 	conn.Logger = c.Logger
 
-	if c.ConnectedCallback != nil {
-		go c.ConnectedCallback()
-	}
-
 	return
 }
 
@@ -185,6 +185,10 @@ func (c *Client) serveConnections(conn *Connection, cp ConnectionProvider) {
 			c.Logger.Debug("client.connection.resubscribing")
 			c.resubscribe(conn)
 			c.Logger.Debug("client.connection.resubscribed")
+
+			if c.ConnectedCallback != nil {
+				go c.ConnectedCallback()
+			}
 			break
 		}
 
