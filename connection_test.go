@@ -82,19 +82,23 @@ func (s *CSuite) TestConnectionDisconnect(c *C) {
 }
 
 func (s *CSuite) TestConnectionLogging(c *C) {
+	conn := NewConnection("foo", "bar", "baz")
+	
 	logger := &DefaultLogger{}
-	s.Connection.SetLogger(logger)
-	c.Assert(s.Connection.GetLogger(), Equals, logger)
+	conn.SetLogger(logger)
+	c.Assert(conn.GetLogger(), Equals, logger)
 }
 
 func (s *CSuite) TestLockingOfGetLogger(c *C) {
+	conn := NewConnection("foo", "bar", "baz")
+
 	resultChan := make(chan Logger)
 
-	s.Connection.Lock()
-	defer s.Connection.Unlock()
+	conn.Lock()
+	defer conn.Unlock()
 
 	go func() {
-		resultChan <- s.Connection.GetLogger()
+		resultChan <- conn.GetLogger()
 	}()
 
 	select {
@@ -105,13 +109,15 @@ func (s *CSuite) TestLockingOfGetLogger(c *C) {
 }
 
 func (s *CSuite) TestReadLockingOfGetLogger(c *C) {
+	conn := NewConnection("foo", "bar", "baz")
+
 	resultChan := make(chan Logger)
 
-	s.Connection.RLock()
-	defer s.Connection.RUnlock()
+	conn.RLock()
+	defer conn.RUnlock()
 
 	go func() {
-		resultChan <- s.Connection.GetLogger()
+		resultChan <- conn.GetLogger()
 	}()
 
 	select {
