@@ -80,3 +80,49 @@ func (s *CSuite) TestConnectionDisconnect(c *C) {
 
 	c.Assert(conn.Closed, Equals, true)
 }
+
+func (s *CSuite) TestConnectionLogging(c *C) {
+	conn := NewConnection("foo", "bar", "baz")
+	
+	logger := &DefaultLogger{}
+	conn.SetLogger(logger)
+	c.Assert(conn.GetLogger(), Equals, logger)
+}
+
+func (s *CSuite) TestLockingOfGetLogger(c *C) {
+	conn := NewConnection("foo", "bar", "baz")
+
+	resultChan := make(chan Logger)
+
+	conn.Lock()
+	defer conn.Unlock()
+
+	go func() {
+		resultChan <- conn.GetLogger()
+	}()
+
+	select {
+	case <-resultChan:
+		c.Error("There should be a lock, but there is none!")
+	case <-time.After(1*time.Second):
+	}
+}
+
+func (s *CSuite) TestReadLockingOfGetLogger(c *C) {
+	conn := NewConnection("foo", "bar", "baz")
+
+	resultChan := make(chan Logger)
+
+	conn.RLock()
+	defer conn.RUnlock()
+
+	go func() {
+		resultChan <- conn.GetLogger()
+	}()
+
+	select {
+	case <-resultChan:
+	case <-time.After(1*time.Second):
+		c.Error("We should be able to read the logger, but are not!")
+	}
+}

@@ -425,12 +425,6 @@ func (s *YSuite) TestClientMessageWithoutSubscription(c *C) {
 	waitReceive(c, "hello to other!", payload, 500)
 }
 
-func (s *YSuite) TestClientLogging(c *C) {
-	logger := &DefaultLogger{}
-	s.Client.Logger = logger
-	c.Assert(s.Client.Logger, Equals, logger)
-}
-
 func (s *YSuite) TestClientPassesLoggerToConnection(c *C) {
 	logger := &DefaultLogger{}
 

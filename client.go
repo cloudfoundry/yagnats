@@ -2,11 +2,13 @@ package yagnats
 
 import (
 	"time"
+	"sync"
 )
 
 type Callback func(*Message)
 
 type Client struct {
+	sync.RWMutex
 	connection    chan *Connection
 	subscriptions map[int]*Subscription
 	disconnecting bool
@@ -103,11 +105,13 @@ func (c *Client) Subscribe(subject string, callback Callback) (int, error) {
 
 	id := len(c.subscriptions) + 1
 
+	c.Lock()
 	c.subscriptions[id] = &Subscription{
 		Subject:  subject,
 		ID:       id,
 		Callback: callback,
 	}
+	c.Unlock()
 
 	conn.Send(
 		&SubPacket{
@@ -148,7 +152,7 @@ func (c *Client) connect(cp ConnectionProvider) (conn *Connection, err error) {
 		return
 	}
 
-	conn.Logger = c.Logger
+	conn.SetLogger(c.Logger)
 
 	return
 }
@@ -224,7 +228,9 @@ func (c *Client) dispatchMessages() {
 			continue
 		}
 
+		c.Lock()
 		sub := c.subscriptions[msg.SubID]
+		c.Unlock()
 		if sub == nil {
 			continue
 		}
