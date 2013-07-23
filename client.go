@@ -152,7 +152,7 @@ func (c *Client) connect(cp ConnectionProvider) (conn *Connection, err error) {
 		return
 	}
 
-	conn.Logger = c.Logger
+	conn.SetLogger(c.Logger)
 
 	return
 }

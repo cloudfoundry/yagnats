@@ -9,6 +9,8 @@ import (
 )
 
 type Connection struct {
+	sync.RWMutex
+
 	conn net.Conn
 
 	addr string
@@ -100,27 +102,27 @@ func (c *Connection) Disconnect() {
 }
 
 func (c *Connection) ErrOrOK() error {
-	c.Logger.Debug("connection.err-or-ok.wait")
+	c.GetLogger().Debug("connection.err-or-ok.wait")
 
 	select {
 	case err := <-c.Errs:
-		c.Logger.Warnd(map[string]interface{}{"error": err.Error()}, "connection.err-or-ok.err")
+		c.GetLogger().Warnd(map[string]interface{}{"error": err.Error()}, "connection.err-or-ok.err")
 		return err
 	case <-c.OKs:
-		c.Logger.Debug("connection.err-or-ok.ok")
+		c.GetLogger().Debug("connection.err-or-ok.ok")
 		return nil
 	}
 }
 
 func (c *Connection) Send(packet Packet) {
-	c.Logger.Debugd(map[string]interface{}{"packet": packet}, "connection.packet.send")
+	c.GetLogger().Debugd(map[string]interface{}{"packet": packet}, "connection.packet.send")
 
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
 	_, err := c.conn.Write(packet.Encode())
 	if err != nil {
-		c.Logger.Errord(map[string]interface{}{"error": err.Error()}, "connection.packet.write-error")
+		c.GetLogger().Errord(map[string]interface{}{"error": err.Error()}, "connection.packet.write-error")
 		c.disconnected()
 	}
 
@@ -151,44 +153,44 @@ func (c *Connection) receivePackets() {
 	io := bufio.NewReader(c.conn)
 
 	for {
-		c.Logger.Debug("connection.packet.read")
+		c.GetLogger().Debug("connection.packet.read")
 
 		packet, err := Parse(io)
 		if err != nil {
-			c.Logger.Errord(map[string]interface{}{"error": err.Error()}, "connection.packet.read-error")
+			c.GetLogger().Errord(map[string]interface{}{"error": err.Error()}, "connection.packet.read-error")
 			c.disconnected()
 			break
 		}
 
 		switch packet.(type) {
 		case *PongPacket:
-			c.Logger.Debug("connection.packet.pong-received")
+			c.GetLogger().Debug("connection.packet.pong-received")
 
 			select {
 			case c.PONGs <- packet.(*PongPacket):
-				c.Logger.Debug("connection.packet.pong-served")
+				c.GetLogger().Debug("connection.packet.pong-served")
 			default:
-				c.Logger.Debug("connection.packet.pong-unhandled")
+				c.GetLogger().Debug("connection.packet.pong-unhandled")
 			}
 
 		case *PingPacket:
-			c.Logger.Debug("connection.packet.ping-received")
+			c.GetLogger().Debug("connection.packet.ping-received")
 			c.Send(&PongPacket{})
 
 		case *OKPacket:
-			c.Logger.Debug("connection.packet.ok-received")
+			c.GetLogger().Debug("connection.packet.ok-received")
 			c.OKs <- packet.(*OKPacket)
 
 		case *ERRPacket:
-			c.Logger.Debug("connection.packet.err-received")
+			c.GetLogger().Debug("connection.packet.err-received")
 			c.Errs <- errors.New(packet.(*ERRPacket).Message)
 
 		case *InfoPacket:
-			c.Logger.Debug("connection.packet.info-received")
+			c.GetLogger().Debug("connection.packet.info-received")
 			// noop
 
 		case *MsgPacket:
-			c.Logger.Debugd(
+			c.GetLogger().Debugd(
 				map[string]interface{}{"packet": packet},
 				"connection.packet.msg-received",
 			)
@@ -196,4 +198,16 @@ func (c *Connection) receivePackets() {
 			c.MSGs <- packet.(*MsgPacket)
 		}
 	}
+}
+
+func (c *Connection) GetLogger() Logger {
+	c.RLock()
+	defer c.RUnlock()
+	return c.Logger
+}
+
+func (c *Connection) SetLogger(logger Logger) {
+	c.Lock()
+	c.Logger = logger
+	defer c.Unlock()
 }

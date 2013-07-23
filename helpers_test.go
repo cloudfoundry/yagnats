@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strconv"
 	"time"
+	"sync"
 )
 
 type FakeConnectionProvider struct {
@@ -96,6 +97,8 @@ func waitUntilNatsDown(port int) error {
 }
 
 type fakeConn struct {
+	sync.RWMutex
+
 	ReadBuffer  *bytes.Buffer
 	WriteBuffer *bytes.Buffer
 	WriteChan   chan string
@@ -103,17 +106,21 @@ type fakeConn struct {
 }
 
 func (f *fakeConn) Read(b []byte) (n int, err error) {
+	f.RLock()
 	if f.Closed {
 		return 0, errors.New("buffer closed")
 	}
+	f.RUnlock()
 
 	return f.ReadBuffer.Read(b)
 }
 
 func (f *fakeConn) Write(b []byte) (n int, err error) {
+	f.RLock()
 	if f.Closed {
 		return 0, errors.New("buffer closed")
 	}
+	f.RUnlock()
 
 	if f.WriteChan != nil {
 		f.WriteChan <- string(b)
@@ -123,7 +130,10 @@ func (f *fakeConn) Write(b []byte) (n int, err error) {
 }
 
 func (f *fakeConn) Close() error {
+	f.Lock()
 	f.Closed = true
+	f.Unlock()
+
 	return nil
 }
 
