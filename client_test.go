@@ -363,6 +363,28 @@ func (s *YSuite) TestClientPubSub(c *C) {
 	waitReceive(c, "hello!", payload, 500)
 }
 
+func (s *YSuite) TestClientPubSubWithQueue(c *C) {
+	payload := make(chan string)
+
+	s.Client.SubscribeWithQueue("some.subject", "some-queue", func(msg *Message) {
+		payload <- msg.Payload
+	})
+
+	s.Client.SubscribeWithQueue("some.subject", "some-queue", func(msg *Message) {
+		payload <- msg.Payload
+	})
+
+	s.Client.Publish("some.subject", "hello!")
+
+	waitReceive(c, "hello!", payload, 500)
+
+	select {
+	case <-payload:
+		c.Error("Should not have received message.")
+	case <-time.After(500 * time.Millisecond):
+	}
+}
+
 func (s *YSuite) TestClientPublishWithReply(c *C) {
 	payload := make(chan string)
 

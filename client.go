@@ -99,29 +99,11 @@ func (c *Client) PublishWithReplyTo(subject, payload, reply string) error {
 }
 
 func (c *Client) Subscribe(subject string, callback Callback) (int, error) {
-	conn := <-c.connection
+	return c.subscribe(subject, "", callback)
+}
 
-	id := len(c.subscriptions) + 1
-
-	c.subscriptions[id] = &Subscription{
-		Subject:  subject,
-		ID:       id,
-		Callback: callback,
-	}
-
-	conn.Send(
-		&SubPacket{
-			Subject: subject,
-			ID:      id,
-		},
-	)
-
-	err := conn.ErrOrOK()
-	if err != nil {
-		return -1, err
-	}
-
-	return id, nil
+func (c *Client) SubscribeWithQueue(subject, queue string, callback Callback) (int, error) {
+	return c.subscribe(subject, queue, callback)
 }
 
 func (c *Client) Unsubscribe(sid int) error {
@@ -142,6 +124,32 @@ func (c *Client) UnsubscribeAll(subject string) {
 	}
 }
 
+func (c *Client) subscribe(subject, queue string, callback Callback) (int, error) {
+	conn := <-c.connection
+
+	id := len(c.subscriptions) + 1
+
+	c.subscriptions[id] = &Subscription{
+		Subject:  subject,
+		ID:       id,
+		Callback: callback,
+	}
+
+	conn.Send(
+		&SubPacket{
+			Subject: subject,
+			Queue:   queue,
+			ID:      id,
+		},
+	)
+
+	err := conn.ErrOrOK()
+	if err != nil {
+		return -1, err
+	}
+
+	return id, nil
+}
 func (c *Client) connect(cp ConnectionProvider) (conn *Connection, err error) {
 	conn, err = cp.ProvideConnection()
 	if err != nil {
