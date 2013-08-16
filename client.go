@@ -227,7 +227,7 @@ func (c *Client) resubscribe(conn *Connection) error {
 func (c *Client) dispatchMessages() {
 	for {
 		conn := <-c.connection
-		msg, ok := <-conn.MSGs
+		msg, ok := <-conn.Messages
 		if !ok {
 			continue
 		}

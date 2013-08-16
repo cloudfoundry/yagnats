@@ -101,7 +101,7 @@ func (s *YSuite) TestClientPingWhenResponseIsTooSlow(c *C) {
 
 	go func() {
 		time.Sleep(1 * time.Second)
-		fakeConn.PONGs <- &PongPacket{}
+		fakeConn.pongs <- &PongPacket{}
 	}()
 
 	c.Assert(disconnectedClient.Ping(), Equals, false)

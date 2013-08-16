@@ -17,10 +17,11 @@ type Connection struct {
 
 	writeLock sync.Mutex
 
-	PONGs chan *PongPacket
-	OKs   chan *OKPacket
-	MSGs  chan *MsgPacket
-	Errs  chan error
+	Messages chan *MsgPacket
+
+	pongs chan *PongPacket
+	oks   chan *OKPacket
+	errs  chan error
 
 	Disconnected chan bool
 
@@ -37,15 +38,16 @@ func NewConnection(addr, user, pass string) *Connection {
 		user: user,
 		pass: pass,
 
-		PONGs: make(chan *PongPacket),
-		OKs:   make(chan *OKPacket),
-		MSGs:  make(chan *MsgPacket),
+		pongs:    make(chan *PongPacket),
+		Messages: make(chan *MsgPacket),
 
 		Logger: &DefaultLogger{},
 
+		oks: make(chan *OKPacket),
+
 		// buffer size of 1 to account for fatal unexpected errors
 		// from the server (i.e. slow consumer)
-		Errs: make(chan error, 1),
+		errs: make(chan error, 1),
 
 		// buffer size of 1 so that read and write errors
 		// can both send without blocking
@@ -103,10 +105,15 @@ func (c *Connection) ErrOrOK() error {
 	c.Logger.Debug("connection.err-or-ok.wait")
 
 	select {
-	case err := <-c.Errs:
-		c.Logger.Warnd(map[string]interface{}{"error": err.Error()}, "connection.err-or-ok.err")
-		return err
-	case <-c.OKs:
+	case err, ok := <-c.errs:
+		if !ok {
+			c.Logger.Warn("connection.err-or-ok.disconnected")
+			return errors.New("disconnected")
+		} else {
+			c.Logger.Warnd(map[string]interface{}{"error": err.Error()}, "connection.err-or-ok.err")
+			return err
+		}
+	case <-c.oks:
 		c.Logger.Debug("connection.err-or-ok.ok")
 		return nil
 	}
@@ -131,7 +138,7 @@ func (c *Connection) Ping() bool {
 	c.Send(&PingPacket{})
 
 	select {
-	case _, ok := <-c.PONGs:
+	case _, ok := <-c.pongs:
 		return ok
 	case <-time.After(500 * time.Millisecond):
 		return false
@@ -143,8 +150,9 @@ func (c *Connection) disconnected() {
 }
 
 func (c *Connection) Close() {
-	close(c.MSGs)
-	close(c.PONGs)
+	close(c.Messages)
+	close(c.pongs)
+	close(c.errs)
 }
 
 func (c *Connection) receivePackets() {
@@ -165,7 +173,7 @@ func (c *Connection) receivePackets() {
 			c.Logger.Debug("connection.packet.pong-received")
 
 			select {
-			case c.PONGs <- packet.(*PongPacket):
+			case c.pongs <- packet.(*PongPacket):
 				c.Logger.Debug("connection.packet.pong-served")
 			default:
 				c.Logger.Debug("connection.packet.pong-unhandled")
@@ -177,11 +185,11 @@ func (c *Connection) receivePackets() {
 
 		case *OKPacket:
 			c.Logger.Debug("connection.packet.ok-received")
-			c.OKs <- packet.(*OKPacket)
+			c.oks <- packet.(*OKPacket)
 
 		case *ERRPacket:
 			c.Logger.Debug("connection.packet.err-received")
-			c.Errs <- errors.New(packet.(*ERRPacket).Message)
+			c.errs <- errors.New(packet.(*ERRPacket).Message)
 
 		case *InfoPacket:
 			c.Logger.Debug("connection.packet.info-received")
@@ -193,7 +201,7 @@ func (c *Connection) receivePackets() {
 				"connection.packet.msg-received",
 			)
 
-			c.MSGs <- packet.(*MsgPacket)
+			c.Messages <- packet.(*MsgPacket)
 		}
 	}
 }

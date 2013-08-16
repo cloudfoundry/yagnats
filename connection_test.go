@@ -80,3 +80,31 @@ func (s *CSuite) TestConnectionDisconnect(c *C) {
 
 	c.Assert(conn.Closed, Equals, true)
 }
+
+func (s *CSuite) TestConnectionErrOrOKOnClose(c *C) {
+	conn := &fakeConn{
+		ReadBuffer:  bytes.NewBuffer([]byte{}),
+		WriteBuffer: bytes.NewBuffer([]byte{}),
+		WriteChan:   make(chan string),
+		Closed:      false,
+	}
+
+	// fill in a fake connection
+	s.Connection.conn = conn
+	go s.Connection.receivePackets()
+
+	errOrOk := make(chan error)
+
+	go func() {
+		errOrOk <- s.Connection.ErrOrOK()
+	}()
+
+	s.Connection.Close()
+
+	select {
+	case err := <-errOrOk:
+		c.Assert(err, ErrorMatches, "disconnected")
+	case <-time.After(1 * time.Second):
+		c.Error("ErrOrOK did not return")
+	}
+}
