@@ -52,7 +52,6 @@ func (c *Client) Connect(cp ConnectionProvider) error {
 	}
 
 	go c.serveConnections(conn, cp)
-	go c.dispatchMessages()
 
 	if c.ConnectedCallback != nil {
 		go c.ConnectedCallback()
@@ -150,11 +149,14 @@ func (c *Client) subscribe(subject, queue string, callback Callback) (int, error
 
 	return id, nil
 }
+
 func (c *Client) connect(cp ConnectionProvider) (conn *Connection, err error) {
 	conn, err = cp.ProvideConnection()
 	if err != nil {
 		return
 	}
+
+	conn.OnMessage(c.dispatchMessage)
 
 	conn.Logger = c.Logger
 
@@ -169,7 +171,6 @@ func (c *Client) serveConnections(conn *Connection, cp ConnectionProvider) {
 		select {
 		case <-conn.Disconnected:
 			c.Logger.Warn("client.connection.disconnected")
-			conn.Close()
 			stop = true
 
 		case c.connection <- conn:
@@ -224,25 +225,17 @@ func (c *Client) resubscribe(conn *Connection) error {
 	return nil
 }
 
-func (c *Client) dispatchMessages() {
-	for {
-		conn := <-c.connection
-		msg, ok := <-conn.Messages
-		if !ok {
-			continue
-		}
-
-		sub := c.subscriptions[msg.SubID]
-		if sub == nil {
-			continue
-		}
-
-		go sub.Callback(
-			&Message{
-				Subject: msg.Subject,
-				Payload: msg.Payload,
-				ReplyTo: msg.ReplyTo,
-			},
-		)
+func (c *Client) dispatchMessage(msg *MsgPacket) {
+	sub := c.subscriptions[msg.SubID]
+	if sub == nil {
+		return
 	}
+
+	go sub.Callback(
+		&Message{
+			Subject: msg.Subject,
+			Payload: msg.Payload,
+			ReplyTo: msg.ReplyTo,
+		},
+	)
 }

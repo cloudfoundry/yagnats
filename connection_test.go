@@ -81,9 +81,41 @@ func (s *CSuite) TestConnectionDisconnect(c *C) {
 	c.Assert(conn.Closed, Equals, true)
 }
 
-func (s *CSuite) TestConnectionErrOrOKOnClose(c *C) {
+func (s *CSuite) TestConnectionErrOrOKReturnsErrorOnDisconnect(c *C) {
 	conn := &fakeConn{
 		ReadBuffer:  bytes.NewBuffer([]byte{}),
+		WriteBuffer: bytes.NewBuffer([]byte{}),
+		WriteChan:   make(chan string),
+	}
+
+	// fill in a fake connection
+	s.Connection.conn = conn
+
+	errOrOK := make(chan error)
+
+	go func() {
+		errOrOK <- s.Connection.ErrOrOK()
+	}()
+
+	go s.Connection.receivePackets()
+
+	select {
+	case <-s.Connection.Disconnected:
+	case <-time.After(1 * time.Second):
+		c.Error("Connection never disconnected.")
+	}
+
+	select {
+	case err := <-errOrOK:
+		c.Assert(err, ErrorMatches, "disconnected")
+	case <-time.After(1 * time.Second):
+		c.Error("Never received result from ErrOrOK.")
+	}
+}
+
+func (s *CSuite) TestConnectionOnMessageCallback(c *C) {
+	conn := &fakeConn{
+		ReadBuffer:  bytes.NewBuffer([]byte("MSG foo 1 5\r\nhello\r\n")),
 		WriteBuffer: bytes.NewBuffer([]byte{}),
 		WriteChan:   make(chan string),
 		Closed:      false,
@@ -91,20 +123,20 @@ func (s *CSuite) TestConnectionErrOrOKOnClose(c *C) {
 
 	// fill in a fake connection
 	s.Connection.conn = conn
+
+	messages := make(chan *MsgPacket)
+
+	s.Connection.OnMessage(func(msg *MsgPacket) {
+		messages <- msg
+	})
+
 	go s.Connection.receivePackets()
 
-	errOrOk := make(chan error)
-
-	go func() {
-		errOrOk <- s.Connection.ErrOrOK()
-	}()
-
-	s.Connection.Close()
-
 	select {
-	case err := <-errOrOk:
-		c.Assert(err, ErrorMatches, "disconnected")
+	case msg := <-messages:
+		c.Assert(msg.SubID, Equals, 1)
+		c.Assert(msg.Payload, Equals, "hello")
 	case <-time.After(1 * time.Second):
-		c.Error("ErrOrOK did not return")
+		c.Error("Did not receive message.")
 	}
 }

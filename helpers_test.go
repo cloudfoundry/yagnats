@@ -7,6 +7,7 @@ import (
 	"net"
 	"os/exec"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -100,9 +101,14 @@ type fakeConn struct {
 	WriteBuffer *bytes.Buffer
 	WriteChan   chan string
 	Closed      bool
+
+	sync.RWMutex
 }
 
 func (f *fakeConn) Read(b []byte) (n int, err error) {
+	f.RLock()
+	defer f.RUnlock()
+
 	if f.Closed {
 		return 0, errors.New("buffer closed")
 	}
@@ -111,6 +117,9 @@ func (f *fakeConn) Read(b []byte) (n int, err error) {
 }
 
 func (f *fakeConn) Write(b []byte) (n int, err error) {
+	f.Lock()
+	defer f.Unlock()
+
 	if f.Closed {
 		return 0, errors.New("buffer closed")
 	}
@@ -123,6 +132,9 @@ func (f *fakeConn) Write(b []byte) (n int, err error) {
 }
 
 func (f *fakeConn) Close() error {
+	f.Lock()
+	defer f.Unlock()
+
 	f.Closed = true
 	return nil
 }

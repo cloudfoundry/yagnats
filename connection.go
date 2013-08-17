@@ -17,11 +17,11 @@ type Connection struct {
 
 	writeLock sync.Mutex
 
-	Messages chan *MsgPacket
-
 	pongs chan *PongPacket
 	oks   chan *OKPacket
 	errs  chan error
+
+	onMessage func(*MsgPacket)
 
 	Disconnected chan bool
 
@@ -38,8 +38,7 @@ func NewConnection(addr, user, pass string) *Connection {
 		user: user,
 		pass: pass,
 
-		pongs:    make(chan *PongPacket),
-		Messages: make(chan *MsgPacket),
+		pongs: make(chan *PongPacket),
 
 		Logger: &DefaultLogger{},
 
@@ -49,9 +48,7 @@ func NewConnection(addr, user, pass string) *Connection {
 		// from the server (i.e. slow consumer)
 		errs: make(chan error, 1),
 
-		// buffer size of 1 so that read and write errors
-		// can both send without blocking
-		Disconnected: make(chan bool, 1),
+		Disconnected: make(chan bool),
 	}
 }
 
@@ -92,6 +89,10 @@ func (c *Connection) Dial() error {
 	return nil
 }
 
+func (c *Connection) OnMessage(callback func(*MsgPacket)) {
+	c.onMessage = callback
+}
+
 func (c *Connection) Handshake() error {
 	c.Send(&ConnectPacket{User: c.user, Pass: c.pass})
 	return c.ErrOrOK()
@@ -105,14 +106,9 @@ func (c *Connection) ErrOrOK() error {
 	c.Logger.Debug("connection.err-or-ok.wait")
 
 	select {
-	case err, ok := <-c.errs:
-		if !ok {
-			c.Logger.Warn("connection.err-or-ok.disconnected")
-			return errors.New("disconnected")
-		} else {
-			c.Logger.Warnd(map[string]interface{}{"error": err.Error()}, "connection.err-or-ok.err")
-			return err
-		}
+	case err := <-c.errs:
+		c.Logger.Warnd(map[string]interface{}{"error": err.Error()}, "connection.err-or-ok.err")
+		return err
 	case <-c.oks:
 		c.Logger.Debug("connection.err-or-ok.ok")
 		return nil
@@ -125,10 +121,10 @@ func (c *Connection) Send(packet Packet) {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
+	// ignore write errors; readPackets will notice connection being interrupted
 	_, err := c.conn.Write(packet.Encode())
 	if err != nil {
 		c.Logger.Errord(map[string]interface{}{"error": err.Error()}, "connection.packet.write-error")
-		c.disconnected()
 	}
 
 	return
@@ -143,16 +139,6 @@ func (c *Connection) Ping() bool {
 	case <-time.After(500 * time.Millisecond):
 		return false
 	}
-}
-
-func (c *Connection) disconnected() {
-	c.Disconnected <- true
-}
-
-func (c *Connection) Close() {
-	close(c.Messages)
-	close(c.pongs)
-	close(c.errs)
 }
 
 func (c *Connection) receivePackets() {
@@ -201,7 +187,12 @@ func (c *Connection) receivePackets() {
 				"connection.packet.msg-received",
 			)
 
-			c.Messages <- packet.(*MsgPacket)
+			c.onMessage(packet.(*MsgPacket))
 		}
 	}
+}
+
+func (c *Connection) disconnected() {
+	c.Disconnected <- true
+	c.errs <- errors.New("disconnected")
 }
