@@ -24,6 +24,7 @@ type Message struct {
 
 type Subscription struct {
 	Subject  string
+	Queue    string
 	Callback Callback
 	ID       int
 }
@@ -130,8 +131,9 @@ func (c *Client) subscribe(subject, queue string, callback Callback) (int, error
 
 	c.subscriptions[id] = &Subscription{
 		Subject:  subject,
-		ID:       id,
+		Queue:    queue,
 		Callback: callback,
+		ID:       id,
 	}
 
 	conn.Send(
@@ -212,6 +214,7 @@ func (c *Client) resubscribe(conn *Connection) error {
 		conn.Send(
 			&SubPacket{
 				Subject: sub.Subject,
+				Queue:   sub.Queue,
 				ID:      id,
 			},
 		)

@@ -466,6 +466,56 @@ func (s *YSuite) TestClientMessageWhileResubscribing(c *C) {
 	waitReceive(c, "resubscribed!", payload, 500)
 }
 
+func (s *YSuite) TestClientPubSubWithQueueReconnectsWithQueue(c *C) {
+	doomedNats := startNats(4213)
+	defer stopCmd(doomedNats)
+
+	durableClient := NewClient()
+	durableClient.Connect(&ConnectionInfo{
+		Addr:     "127.0.0.1:4213",
+		Username: "nats",
+		Password: "nats",
+	})
+
+	payload := make(chan string)
+
+	durableClient.SubscribeWithQueue("some.subject", "some-queue", func(msg *Message) {
+		payload <- msg.Payload
+	})
+
+	durableClient.SubscribeWithQueue("some.subject", "some-queue", func(msg *Message) {
+		payload <- msg.Payload
+	})
+
+	durableClient.Publish("some.subject", "hello!")
+
+	waitReceive(c, "hello!", payload, 500)
+
+	select {
+	case <-payload:
+		c.Error("Should not have received message.")
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	stopCmd(doomedNats)
+	waitUntilNatsDown(4213)
+
+	doomedNats = startNats(4213)
+	defer stopCmd(doomedNats)
+
+	waitUntilNatsUp(4213)
+
+	durableClient.Publish("some.subject", "hello!")
+
+	waitReceive(c, "hello!", payload, 500)
+
+	select {
+	case <-payload:
+		c.Error("Should not have received message.")
+	case <-time.After(500 * time.Millisecond):
+	}
+}
+
 func waitReceive(c *C, expected string, from chan string, ms time.Duration) {
 	select {
 	case msg := <-from:
