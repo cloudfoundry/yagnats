@@ -5,9 +5,10 @@ import (
 )
 
 type FakeYagnats struct {
-	Subscriptions     map[string][]yagnats.Subscription
-	PublishedMessages map[string][]yagnats.Message
-	Unsubscriptions   []int
+	Subscriptions        map[string][]yagnats.Subscription
+	PublishedMessages    map[string][]yagnats.Message
+	Unsubscriptions      []int
+	UnsubscribedSubjects []string
 
 	ConnectedConnectionProvider yagnats.ConnectionProvider
 
@@ -16,8 +17,7 @@ type FakeYagnats struct {
 	SubscribeError   error
 	UnsubscribeError error
 
-	DidUnsubscribeAll bool
-	PingResponse      bool
+	PingResponse bool
 
 	counter int
 }
@@ -32,6 +32,7 @@ func (f *FakeYagnats) Reset() {
 	f.PublishedMessages = map[string][]yagnats.Message{}
 	f.Subscriptions = map[string][]yagnats.Subscription{}
 	f.Unsubscriptions = []int{}
+	f.UnsubscribedSubjects = []string{}
 
 	f.ConnectedConnectionProvider = nil
 
@@ -40,7 +41,6 @@ func (f *FakeYagnats) Reset() {
 	f.SubscribeError = nil
 	f.UnsubscribeError = nil
 
-	f.DidUnsubscribeAll = false
 	f.PingResponse = true
 
 	f.counter = 0
@@ -99,6 +99,6 @@ func (f *FakeYagnats) Unsubscribe(subscription int) error {
 	return f.UnsubscribeError
 }
 
-func (f *FakeYagnats) UnsubscribeAll() {
-	f.DidUnsubscribeAll = true
+func (f *FakeYagnats) UnsubscribeAll(subject string) {
+	f.UnsubscribedSubjects = append(f.UnsubscribedSubjects, subject)
 }
