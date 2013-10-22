@@ -55,7 +55,7 @@ func (c *DisconnectingConnectionProvider) ProvideConnection() (*Connection, erro
 }
 
 func startNats(port int) *exec.Cmd {
-	cmd := exec.Command("nats-server", "-p", strconv.Itoa(port), "--user", "nats", "--pass", "nats")
+	cmd := exec.Command("gnatsd", "-p", strconv.Itoa(port), "--user", "nats", "--pass", "nats")
 	err := cmd.Start()
 	if err != nil {
 		fmt.Printf("NATS failed to start: %v\n", err)

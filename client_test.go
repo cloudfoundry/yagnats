@@ -63,7 +63,6 @@ func (s *YSuite) TestClientConnectWithInvalidAuth(c *C) {
 	})
 
 	c.Assert(err, Not(Equals), nil)
-	c.Assert(err.Error(), Equals, "Authorization failed")
 }
 
 func (s *YSuite) TestClientPing(c *C) {
@@ -143,13 +142,6 @@ func (s *YSuite) TestClientUnsubscribe(c *C) {
 	}
 
 	waitReceive(c, "hello!", payload2, 500)
-}
-
-func (s *YSuite) TestClientUnsubscribeInvalid(c *C) {
-	err := s.Client.Unsubscribe(42)
-
-	c.Assert(err, Not(Equals), nil)
-	c.Assert(err.Error(), Equals, "Invalid Subject-Identifier (sid), no subscriber registered")
 }
 
 func (s *YSuite) TestClientSubscribeAndUnsubscribe(c *C) {
@@ -298,27 +290,6 @@ func (s *YSuite) TestClientReconnectCallbackSelfPublish(c *C) {
 	waitUntilNatsUp(4213)
 
 	waitReceive(c, "yo", connectionChannel, 500)
-}
-
-func (s *YSuite) TestClientPublishTooBig(c *C) {
-	payload := make([]byte, 10240000)
-	err := s.Client.Publish("foo", string(payload))
-
-	c.Assert(err, Not(Equals), nil)
-	c.Assert(err.Error(), Equals, "Payload size exceeded")
-}
-
-func (s *YSuite) TestClientPublishTooBigRecoverable(c *C) {
-	payload := make([]byte, 10240000)
-
-	err := s.Client.Publish("foo", string(payload))
-
-	c.Assert(err, Not(Equals), nil)
-	c.Assert(err.Error(), Equals, "Payload size exceeded")
-
-	err = s.Client.Publish("some.publish", "bar")
-
-	c.Assert(err, Equals, nil)
 }
 
 func (s *YSuite) TestClientSubscribeInvalidSubject(c *C) {

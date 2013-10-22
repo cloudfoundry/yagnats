@@ -8,7 +8,7 @@ matrix:
     - go: tip
 
 install:
-  - gem install nats
+  - go get -v github.com/apcera/gnatsd
   - go get -v launchpad.net/gocheck
   - go get -v ./...
   - go build -v ./...
