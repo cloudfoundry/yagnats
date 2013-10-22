@@ -4,6 +4,18 @@ import (
 	"time"
 )
 
+type NATSClient interface {
+	Ping() bool
+	Connect(connectionProvider ConnectionProvider) error
+	Disconnect()
+	Publish(subject, payload string) error
+	PublishWithReplyTo(subject, payload, reply string) error
+	Subscribe(subject string, callback Callback) (int, error)
+	SubscribeWithQueue(subject, queue string, callback Callback) (int, error)
+	Unsubscribe(subscription int) error
+	UnsubscribeAll(subject string)
+}
+
 type Callback func(*Message)
 
 type Client struct {
