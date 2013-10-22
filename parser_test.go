@@ -40,7 +40,7 @@ func (s *YSuite) TestParsePong(c *C) {
 }
 
 func (s *YSuite) TestParseInfo(c *C) {
-	packet, err := Parse(bufio.NewReader(bytes.NewBuffer([]byte("INFO {\"a\":1}\r\n"))))
+	packet, err := Parse(bufio.NewReader(bytes.NewBuffer([]byte("INFO {\"a\":1} \r\n"))))
 
 	c.Assert(err, Equals, nil)
 	c.Assert(packet, Not(Equals), nil)
@@ -58,7 +58,7 @@ func (s *YSuite) TestParseOK(c *C) {
 }
 
 func (s *YSuite) TestParseERR(c *C) {
-	packet, err := Parse(bufio.NewReader(bytes.NewBuffer([]byte("-ERR 'foo'\r\n"))))
+	packet, err := Parse(bufio.NewReader(bytes.NewBuffer([]byte("-ERR 'foo'  \r\n"))))
 
 	c.Assert(err, Equals, nil)
 	c.Assert(packet, Not(Equals), nil)
@@ -67,7 +67,7 @@ func (s *YSuite) TestParseERR(c *C) {
 }
 
 func (s *YSuite) TestParseMsg(c *C) {
-	packet, err := Parse(bufio.NewReader(bytes.NewBuffer([]byte("MSG some.subject 42 4\r\nsup?\r\n"))))
+	packet, err := Parse(bufio.NewReader(bytes.NewBuffer([]byte("MSG some.subject 42 4\r\nsup?  \r\n"))))
 
 	c.Assert(err, Equals, nil)
 	c.Assert(packet, Not(Equals), nil)

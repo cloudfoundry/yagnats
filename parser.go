@@ -33,24 +33,39 @@ var PARSERS = map[string]Parser{
 	// -ERR '(message)'\r\n
 	"-ERR": func(io *bufio.Reader) (Packet, error) {
 		bytes, _ := io.ReadBytes('\n')
-		re := regexp.MustCompile(`\s*'(.*)'\r\n`)
+		re := regexp.MustCompile(`\s*'(.*)'\s*\r\n`)
 		match := re.FindSubmatchIndex(bytes)
+
+		if match == nil {
+			return nil, errors.New("Malformed -ERR message")
+		}
+
 		return &ERRPacket{Message: string(bytes[match[2]:match[3]])}, nil
 	},
 
 	// INFO (payload)\r\n
 	"INFO": func(io *bufio.Reader) (Packet, error) {
 		bytes, _ := io.ReadBytes('\n')
-		re := regexp.MustCompile(`\s*([^\s]+)\r\n`)
+		re := regexp.MustCompile(`\s*([^\s]+)\s*\r\n`)
+
 		match := re.FindSubmatchIndex(bytes)
+
+		if match == nil {
+			return nil, errors.New("Malformed INFO message")
+		}
+
 		return &InfoPacket{Payload: string(bytes[match[2]:match[3]])}, nil
 	},
 
 	// MSG (subject) (subscriber-id) (reply)? (length)\r\n(byte * length)\r\n
 	"MSG": func(io *bufio.Reader) (Packet, error) {
 		bytes, _ := io.ReadBytes('\n')
-		re := regexp.MustCompile(`\s*([^\s]+)\s+(\d+)\s+(([^\s]+)\s+)?(\d+)\r\n`)
+		re := regexp.MustCompile(`\s*([^\s]+)\s+(\d+)\s+(([^\s]+)\s+)?(\d+)\s*\r\n`)
 		matches := re.FindStringSubmatch(string(bytes))
+
+		if matches == nil {
+			return nil, errors.New("Malformed MSG message")
+		}
 
 		subID, _ := strconv.Atoi(matches[2])
 		payloadLen, _ := strconv.Atoi(matches[5])
