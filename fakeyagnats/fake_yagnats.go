@@ -61,7 +61,7 @@ func (f *FakeYagnats) Disconnect() {
 }
 
 func (f *FakeYagnats) Publish(subject string, payload []byte) error {
-	return f.PublishWithReplyTo(subject, payload, "")
+	return f.PublishWithReplyTo(subject, "", payload)
 }
 
 func (f *FakeYagnats) PublishWithReplyTo(subject, reply string, payload []byte) error {
