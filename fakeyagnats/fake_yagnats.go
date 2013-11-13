@@ -17,6 +17,7 @@ type FakeYagnats struct {
 	SubscribeError   error
 	UnsubscribeError error
 
+	OnPing       func() bool
 	PingResponse bool
 
 	counter int
@@ -47,6 +48,10 @@ func (f *FakeYagnats) Reset() {
 }
 
 func (f *FakeYagnats) Ping() bool {
+	if f.OnPing != nil {
+		return f.OnPing()
+	}
+
 	return f.PingResponse
 }
 
