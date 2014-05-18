@@ -40,7 +40,7 @@ func (f *FakeYagnats) Reset() {
 
 	f.publishedMessages = map[string][]yagnats.Message{}
 	f.subscriptions = map[string][]yagnats.Subscription{}
-	f.unsubscriptions = []int{}
+	f.unsubscriptions = []int64{}
 	f.unsubscribedSubjects = []string{}
 
 	f.connectedConnectionProvider = nil
