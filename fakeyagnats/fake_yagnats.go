@@ -9,7 +9,7 @@ import (
 type FakeYagnats struct {
 	subscriptions        map[string][]yagnats.Subscription
 	publishedMessages    map[string][]yagnats.Message
-	unsubscriptions      []int
+	unsubscriptions      []int64
 	unsubscribedSubjects []string
 
 	connectedConnectionProvider yagnats.ConnectionProvider
@@ -23,7 +23,7 @@ type FakeYagnats struct {
 	onPing       func() bool
 	pingResponse bool
 
-	nextSubscriptionID int
+	nextSubscriptionID int64
 
 	sync.RWMutex
 }
@@ -137,11 +137,11 @@ func (f *FakeYagnats) PublishWithReplyTo(subject, reply string, payload []byte) 
 	return nil
 }
 
-func (f *FakeYagnats) Subscribe(subject string, callback yagnats.Callback) (int, error) {
+func (f *FakeYagnats) Subscribe(subject string, callback yagnats.Callback) (int64, error) {
 	return f.SubscribeWithQueue(subject, "", callback)
 }
 
-func (f *FakeYagnats) SubscribeWithQueue(subject, queue string, callback yagnats.Callback) (int, error) {
+func (f *FakeYagnats) SubscribeWithQueue(subject, queue string, callback yagnats.Callback) (int64, error) {
 	f.RLock()
 
 	injectedCallback, injected := f.whenSubscribing[subject]
@@ -172,7 +172,7 @@ func (f *FakeYagnats) SubscribeWithQueue(subject, queue string, callback yagnats
 	return subscription.ID, nil
 }
 
-func (f *FakeYagnats) Unsubscribe(subscription int) error {
+func (f *FakeYagnats) Unsubscribe(subscription int64) error {
 	f.Lock()
 	defer f.Unlock()
 
