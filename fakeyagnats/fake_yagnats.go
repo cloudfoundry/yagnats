@@ -17,8 +17,8 @@ type FakeYagnats struct {
 	connectError     error
 	unsubscribeError error
 
-	whenSubscribing map[string]func() error
-	whenPublishing  map[string]func() error
+	whenSubscribing map[string]func(yagnats.Callback) error
+	whenPublishing  map[string]func(*yagnats.Message) error
 
 	onPing       func() bool
 	pingResponse bool
@@ -48,8 +48,8 @@ func (f *FakeYagnats) Reset() {
 	f.connectError = nil
 	f.unsubscribeError = nil
 
-	f.whenSubscribing = map[string]func() error{}
-	f.whenPublishing = map[string]func() error{}
+	f.whenSubscribing = map[string]func(yagnats.Callback) error{}
+	f.whenPublishing = map[string]func(*yagnats.Message) error{}
 
 	f.pingResponse = true
 
@@ -120,7 +120,7 @@ func (f *FakeYagnats) PublishWithReplyTo(subject, reply string, payload []byte) 
 	f.RUnlock()
 
 	if injected {
-		err := injectedCallback()
+		err := injectedCallback(message)
 		if err != nil {
 			return err
 		}
@@ -149,7 +149,7 @@ func (f *FakeYagnats) SubscribeWithQueue(subject, queue string, callback yagnats
 	f.RUnlock()
 
 	if injected {
-		err := injectedCallback()
+		err := injectedCallback(callback)
 		if err != nil {
 			return 0, err
 		}
@@ -192,7 +192,7 @@ func (f *FakeYagnats) UnsubscribeAll(subject string) {
 	f.unsubscribedSubjects = append(f.unsubscribedSubjects, subject)
 }
 
-func (f *FakeYagnats) WhenSubscribing(subject string, callback func() error) {
+func (f *FakeYagnats) WhenSubscribing(subject string, callback func(yagnats.Callback) error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -206,7 +206,7 @@ func (f *FakeYagnats) Subscriptions(subject string) []yagnats.Subscription {
 	return f.subscriptions[subject]
 }
 
-func (f *FakeYagnats) WhenPublishing(subject string, callback func() error) {
+func (f *FakeYagnats) WhenPublishing(subject string, callback func(*yagnats.Message) error) {
 	f.Lock()
 	defer f.Unlock()
 
