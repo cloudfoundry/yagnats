@@ -2,8 +2,11 @@ package yagnats
 
 import (
 	"bytes"
-	"time"
+	"errors"
 	. "launchpad.net/gocheck"
+	"net"
+	"runtime"
+	"time"
 )
 
 type CSuite struct {
@@ -176,4 +179,55 @@ func (s *CSuite) TestConnectionClusterReconnectsToRandomNode(c *C) {
 
 	c.Assert(hellos, Not(Equals), 0)
 	c.Assert(goodbyes, Not(Equals), 0)
+}
+
+//This hacky test was derived from http://golang.org/src/pkg/net/dial_test.go#TestDialTimeout
+func (s *CSuite) TestConnectionTimeout(c *C) {
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	defer ln.Close()
+	errc := make(chan error)
+	switch runtime.GOOS {
+	case "linux":
+		for i := 0; i < 1000; i++ {
+			go func() {
+				conn := NewConnection(ln.Addr().String(), "nats", "nats")
+				err := conn.Dial()
+				errc <- err
+			}()
+		}
+	case "darwin", "plan9", "windows":
+		go func() {
+			conn := NewConnection("127.0.71.111:49151", "nats", "nats")
+			err := conn.Dial()
+			if err == nil {
+				err = errors.New("unexpected: connected to 127.0.71.111:49151")
+				conn.Disconnect()
+			}
+			errc <- err
+		}()
+	default:
+		c.Skip("skipping test on " + runtime.GOOS)
+	}
+
+	connected := 0
+	for {
+		select {
+		case <-time.After(15 * time.Second):
+			c.Fatal("too slow")
+		case err := <-errc:
+			if err == nil {
+				connected++
+				if connected == 1000 {
+					c.Fatal("all connections connected; expected some to time out")
+				}
+			} else {
+				timeout := err.(*net.OpError).Timeout()
+				if !timeout {
+					c.Fatalf("got error %q; not a timeout", err)
+				}
+				// Pass. We saw a timeout error.
+				return
+			}
+		}
+	}
 }
