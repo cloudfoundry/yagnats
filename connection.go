@@ -90,7 +90,7 @@ func (c *ConnectionCluster) ProvideConnection() (*Connection, error) {
 }
 
 func (c *Connection) Dial() error {
-	conn, err := net.Dial("tcp", c.addr)
+	conn, err := net.DialTimeout("tcp", c.addr, 5 * time.Second)
 	if err != nil {
 		return err
 	}
