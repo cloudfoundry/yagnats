@@ -16,6 +16,8 @@ type Connection struct {
 	user string
 	pass string
 
+	connectionTimeout time.Duration
+
 	writeLock *sync.Mutex
 
 	pongs chan *PongPacket
@@ -58,13 +60,17 @@ func NewConnection(addr, user, pass string) *Connection {
 }
 
 type ConnectionInfo struct {
-	Addr     string
-	Username string
-	Password string
+	Addr              string
+	Username          string
+	Password          string
+	ConnectionTimeout time.Duration
 }
 
 func (c *ConnectionInfo) ProvideConnection() (*Connection, error) {
 	conn := NewConnection(c.Addr, c.Username, c.Password)
+	if c.ConnectionTimeout > 0 {
+		conn.connectionTimeout = c.ConnectionTimeout
+	}
 
 	var err error
 
@@ -90,7 +96,15 @@ func (c *ConnectionCluster) ProvideConnection() (*Connection, error) {
 }
 
 func (c *Connection) Dial() error {
-	conn, err := net.DialTimeout("tcp", c.addr, 5 * time.Second)
+	var conn net.Conn
+	var err error
+
+	if c.connectionTimeout > 0 {
+		conn, err = net.DialTimeout("tcp", c.addr, c.connectionTimeout)
+	} else {
+		conn, err = net.Dial("tcp", c.addr)
+	}
+
 	if err != nil {
 		return err
 	}
