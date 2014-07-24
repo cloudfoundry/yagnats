@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
-	"runtime"
 	"testing"
 	"time"
 
@@ -46,73 +45,6 @@ func (s *YSuite) TearDownTest(c *C) {
 	s.Client = nil
 }
 
-func (s *YSuite) TestConnectWithTimeout(c *C) {
-	// System timeout behavior varies from platform to platform.
-	// See http://golang.org/src/pkg/net/dial_test.go#TestDialTimeout
-	switch runtime.GOOS {
-	case "linux":
-		ln, _ := net.Listen("tcp", "127.0.0.1:0")
-		defer ln.Close()
-
-		errChan := make(chan error)
-		numConns := 200
-
-		for i := 0; i < numConns; i++ {
-			go func() {
-				client := NewClient()
-				err := client.Connect(&ConnectionInfo{
-					Addr:              ln.Addr().String(),
-					Username:          "nats",
-					Password:          "nats",
-					ConnectionTimeout: time.Second,
-				})
-				errChan <- err
-			}()
-		}
-
-		connected := 0
-		for {
-			select {
-			case <-time.After(5 * time.Second):
-				c.Fatal("Test run too slow")
-			case err := <-errChan:
-				if err == nil {
-					connected++
-					if connected == numConns {
-						c.Fatal("all connections connected; expected some to time out")
-					}
-				} else {
-					timeout := err.(*net.OpError).Timeout()
-					if !timeout {
-						c.Fatalf("got error %q; not a timeout", err)
-					}
-
-					// Pass. We saw a timeout error.
-					return
-				}
-			}
-		}
-
-	case "darwin", "plan9", "windows":
-		client := NewClient()
-
-		startTime := time.Now()
-		client.Connect(&ConnectionInfo{
-			Addr:              "127.0.71.111:49151",
-			Username:          "nats",
-			Password:          "nats",
-			ConnectionTimeout: time.Second,
-		})
-
-		c.Assert(time.Since(startTime) <= time.Second+300*time.Millisecond, Equals, true)
-
-		client.Disconnect()
-
-	default:
-		c.Skip("skipping test on " + runtime.GOOS)
-	}
-}
-
 func (s *YSuite) TestDisconnectOnNewClient(c *C) {
 	client := NewClient()
 	client.Disconnect()
@@ -137,6 +69,30 @@ func (s *YSuite) TestClientConnectWithInvalidAuth(c *C) {
 	})
 
 	c.Assert(err, Not(Equals), nil)
+}
+
+func (s *YSuite) TestConnectWithCustomDial(c *C) {
+	var dialTargetNetwork string
+	var dialTargetAddress string
+
+	client := NewClient()
+	defer client.Disconnect()
+
+	client.Connect(&ConnectionInfo{
+		Addr:     "127.0.0.1:9999",
+		Username: "nats",
+		Password: "nats",
+		Dial: func(network, addr string) (net.Conn, error) {
+			dialTargetNetwork = network
+			dialTargetAddress = addr
+
+			return net.DialTimeout("tcp", "127.0.0.1:4223", 1*time.Second)
+		},
+	})
+
+	c.Assert(s.Client.Ping(), Equals, true)
+	c.Assert(dialTargetNetwork, Equals, "tcp")
+	c.Assert(dialTargetAddress, Equals, "127.0.0.1:9999")
 }
 
 func (s *YSuite) TestClientPing(c *C) {

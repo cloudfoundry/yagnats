@@ -16,7 +16,7 @@ type Connection struct {
 	user string
 	pass string
 
-	connectionTimeout time.Duration
+	dial func(network, address string) (net.Conn, error)
 
 	writeLock *sync.Mutex
 
@@ -42,6 +42,10 @@ func NewConnection(addr, user, pass string) *Connection {
 		user: user,
 		pass: pass,
 
+		dial: func(network, address string) (net.Conn, error) {
+			return net.DialTimeout(network, address, 5*time.Second)
+		},
+
 		writeLock: &sync.Mutex{},
 
 		logger:      &DefaultLogger{},
@@ -60,16 +64,16 @@ func NewConnection(addr, user, pass string) *Connection {
 }
 
 type ConnectionInfo struct {
-	Addr              string
-	Username          string
-	Password          string
-	ConnectionTimeout time.Duration
+	Addr     string
+	Username string
+	Password string
+	Dial     func(network, address string) (net.Conn, error)
 }
 
 func (c *ConnectionInfo) ProvideConnection() (*Connection, error) {
 	conn := NewConnection(c.Addr, c.Username, c.Password)
-	if c.ConnectionTimeout > 0 {
-		conn.connectionTimeout = c.ConnectionTimeout
+	if c.Dial != nil {
+		conn.dial = c.Dial
 	}
 
 	var err error
@@ -96,15 +100,7 @@ func (c *ConnectionCluster) ProvideConnection() (*Connection, error) {
 }
 
 func (c *Connection) Dial() error {
-	var conn net.Conn
-	var err error
-
-	if c.connectionTimeout > 0 {
-		conn, err = net.DialTimeout("tcp", c.addr, c.connectionTimeout)
-	} else {
-		conn, err = net.Dial("tcp", c.addr)
-	}
-
+	conn, err := c.dial("tcp", c.addr)
 	if err != nil {
 		return err
 	}
