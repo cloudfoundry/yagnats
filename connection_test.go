@@ -2,10 +2,7 @@ package yagnats
 
 import (
 	"bytes"
-	"errors"
 	. "launchpad.net/gocheck"
-	"net"
-	"runtime"
 	"time"
 )
 
