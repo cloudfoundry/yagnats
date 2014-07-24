@@ -22,9 +22,9 @@ client.Subscribe("some.subject", func(msg *Message) {
 client.Publish("some.subject", []byte("Sup son?"))
 ```
 
-Testing on Linux:
+Testing in a Linux VM via Vagrant:
 
 ```bash
 vagrant up --provider=virtualbox
-vagrant ssh -c 'cd /gopath/src/github.com/cloudfoundry/yagnats && bin test -v'
+vagrant ssh -c 'cd /gopath/src/github.com/cloudfoundry/yagnats && bin test -v ./...'
 ```
