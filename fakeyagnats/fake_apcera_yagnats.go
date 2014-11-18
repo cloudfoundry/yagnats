@@ -32,6 +32,10 @@ func Connect() *FakeNATSConn {
 
 func (f *FakeNATSConn) AddReconnectedCB(_ func(*nats.Conn)) {}
 
+func (f *FakeNATSConn) AddClosedCB(_ func(*nats.Conn)) {}
+
+func (f *FakeNATSConn) AddDisconnectedCB(_ func(*nats.Conn)) {}
+
 func (f *FakeNATSConn) Reset() {
 	f.Lock()
 	defer f.Unlock()
