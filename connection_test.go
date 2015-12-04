@@ -83,6 +83,26 @@ func (s *CSuite) TestConnectionDisconnect(c *C) {
 	c.Assert(conn.Closed, Equals, true)
 }
 
+func (s *CSuite) TestConnectionDisconnectsOnParseErr(c *C) {
+	conn := &fakeConn{
+		ReadBuffer:  bytes.NewBuffer([]byte("!BAD\r\n")),
+		WriteBuffer: bytes.NewBuffer([]byte{}),
+		WriteChan:   make(chan []byte),
+		Closed:      false,
+	}
+
+	// fill in a fake connection
+	s.Connection.conn = conn
+	go s.Connection.receivePackets()
+
+	select {
+	case <-s.Connection.Disconnected:
+		c.Assert(conn.Closed, Equals, true)
+	case <-time.After(1 * time.Second):
+		c.Error("Connection never disconnected.")
+	}
+}
+
 func (s *CSuite) TestConnectionErrOrOKReturnsErrorOnDisconnect(c *C) {
 	conn := &fakeConn{
 		ReadBuffer:  bytes.NewBuffer([]byte{}),
