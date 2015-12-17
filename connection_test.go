@@ -2,8 +2,10 @@ package yagnats
 
 import (
 	"bytes"
-	. "launchpad.net/gocheck"
+	"sync"
 	"time"
+
+	. "launchpad.net/gocheck"
 )
 
 type CSuite struct {
@@ -142,6 +144,8 @@ func (s *CSuite) TestConnectionOnMessageCallback(c *C) {
 }
 
 func (s *CSuite) TestConnectionClusterReconnectsAnother(c *C) {
+	lock := sync.Mutex{}
+	waitGroup := sync.WaitGroup{}
 	hellos := 0
 	thanks := 0
 	goodbyes := 0
@@ -173,25 +177,36 @@ func (s *CSuite) TestConnectionClusterReconnectsAnother(c *C) {
 		cluster := &ConnectionCluster{[]ConnectionProvider{nodes[0], nodes[1], nodes[2]}}
 
 		conn, err := cluster.ProvideConnection()
+
 		if err != nil {
 			c.Assert(err.Error(), Equals, "error on dialing")
 			errs += 1
 		} else {
+			waitGroup.Add(1)
 			conn.OnMessage(func(msg *MsgPacket) {
+				lock.Lock()
+				defer lock.Unlock()
+
 				if string(msg.Payload) == "hello" {
-					hellos += 1
+					hellos++
 				}
 				if string(msg.Payload) == "thank" {
-					thanks += 1
+					thanks++
 				}
 				if string(msg.Payload) == "goodbye" {
-					goodbyes += 1
+					goodbyes++
 				}
+				waitGroup.Done()
 			})
 
 			conn.ErrOrOK()
 		}
 	}
+
+	waitGroup.Wait()
+
+	lock.Lock()
+	defer lock.Unlock()
 
 	c.Assert(hellos, Equals, 1)
 	c.Assert(thanks, Equals, 1)
