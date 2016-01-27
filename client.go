@@ -20,17 +20,18 @@ type NATSClient interface {
 type Callback func(*Message)
 
 type Client struct {
-	connection          chan *Connection
-	subscriptions       map[int64]*Subscription
-	subscriptionCounter int64
-	connected           bool
-	disconnecting       bool
-	lock                *sync.Mutex
+	connection              chan *Connection
+	subscriptions           map[int64]*Subscription
+	subscriptionCounter     int64
+	connected               bool
+	disconnecting           bool
+	lock                    *sync.Mutex
 
-	ConnectedCallback func()
+	ConnectedCallback       func()
+	BeforeReconnectCallback func()
 
-	logger      Logger
-	loggerMutex *sync.RWMutex
+	logger                  Logger
+	loggerMutex             *sync.RWMutex
 }
 
 type Message struct {
@@ -256,6 +257,10 @@ func (c *Client) connect(cp ConnectionProvider) (conn *Connection, err error) {
 }
 
 func (c *Client) reconnect(cp ConnectionProvider) {
+	if c.BeforeReconnectCallback != nil {
+		c.BeforeReconnectCallback()
+	}
+
 	// acquire new connection
 	for {
 		c.Logger().Debug("client.reconnect.starting")
