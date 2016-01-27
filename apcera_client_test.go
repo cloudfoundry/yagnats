@@ -62,14 +62,15 @@ func (s *YSuite) TestApceraClientReconnectCB(c *C) {
 }
 
 func (s *YSuite) TestApceraClientClosdCB(c *C) {
-	closeCalled := false
+	closeChannel := make(chan []byte)
+
 	closedClient := Must(Connect([]string{"nats://nats:nats@127.0.0.1:4223"}))
 	closedClient.AddClosedCB(func(_ *nats.Conn) {
-		closeCalled = true
+		closeChannel <- []byte("closed")
 	})
 	closedClient.Close()
 
-	c.Assert(closeCalled, Equals, true)
+	waitReceive(c, "closed", closeChannel, 500)
 }
 
 func (s *YSuite) TestApceraClientDisconnectedCB(c *C) {
