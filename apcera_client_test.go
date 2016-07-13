@@ -6,8 +6,18 @@ import (
 
 	"github.com/nats-io/nats"
 
-	. "launchpad.net/gocheck"
+	. "gopkg.in/check.v1"
 )
+
+func (s *YSuite) TestApceraConnectWithOptions(c *C) {
+	opts := nats.DefaultOptions
+	opts.PingInterval = time.Duration(30) * time.Second
+	opts.Servers = []string{"nats://nats:nats@127.0.0.1:4223"}
+
+	client := Must(ConnectWithOptions(opts))
+
+	c.Assert(client.Options().PingInterval, Equals, opts.PingInterval)
+}
 
 func (s *YSuite) TestApceraCloseOnNewClient(c *C) {
 	client := Must(Connect([]string{"nats://nats:nats@127.0.0.1:4223"}))
