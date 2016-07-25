@@ -44,10 +44,8 @@ func newApceraClient() *apceraNATSWrapper {
 }
 
 func Connect(urls []string) (NATSConn, error) {
-	options := nats.DefaultOptions
+	options := DefaultOptions()
 	options.Servers = urls
-	options.ReconnectWait = 500 * time.Millisecond
-	options.MaxReconnect = -1
 
 	s := newApceraClient()
 
@@ -64,7 +62,8 @@ func Connect(urls []string) (NATSConn, error) {
 	return s, nil
 }
 
-func ConnectWithOptions(opts nats.Options) (NATSConn, error) {
+func ConnectWithOptions(urls []string, opts nats.Options) (NATSConn, error) {
+	opts.Servers = urls
 	s := newApceraClient()
 
 	opts.ReconnectedCB = s.apceraReconnectCB
@@ -79,6 +78,14 @@ func ConnectWithOptions(opts nats.Options) (NATSConn, error) {
 	s.Conn = conn
 	return s, nil
 
+}
+
+func DefaultOptions() nats.Options {
+	options := nats.DefaultOptions
+	options.ReconnectWait = 500 * time.Millisecond
+	options.MaxReconnect = -1
+
+	return options
 }
 
 func (c *apceraNATSWrapper) AddReconnectedCB(handler func(*nats.Conn)) {
