@@ -10,13 +10,19 @@ import (
 )
 
 func (s *YSuite) TestApceraConnectWithOptions(c *C) {
-	opts := nats.DefaultOptions
+	opts := DefaultOptions()
 	opts.PingInterval = time.Duration(30) * time.Second
-	opts.Servers = []string{"nats://nats:nats@127.0.0.1:4223"}
+	urls := []string{"nats://nats:nats@127.0.0.1:4223"}
 
-	client := Must(ConnectWithOptions(opts))
+	client := Must(ConnectWithOptions(urls, opts))
 
 	c.Assert(client.Options().PingInterval, Equals, opts.PingInterval)
+}
+
+func (s *YSuite) TestDefaultOptions(c *C) {
+	opts := DefaultOptions()
+	c.Assert(opts.ReconnectWait, Equals, 500*time.Millisecond)
+	c.Assert(opts.MaxReconnect, Equals, -1)
 }
 
 func (s *YSuite) TestApceraCloseOnNewClient(c *C) {
