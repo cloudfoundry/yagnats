@@ -141,6 +141,7 @@ func (c *Connection) ErrOrOK() error {
 		c.Logger().Debug("connection.err-or-ok.ok")
 		return nil
 	}
+	return nil
 }
 
 func (c *Connection) Send(packet Packet) {

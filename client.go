@@ -67,6 +67,7 @@ func (c *Client) Ping() bool {
 	case <-time.After(500 * time.Millisecond):
 		return false
 	}
+	return false
 }
 
 func (c *Client) Connect(cp ConnectionProvider) error {
