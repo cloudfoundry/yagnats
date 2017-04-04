@@ -3,6 +3,7 @@ package yagnats
 import (
 	. "gopkg.in/check.v1"
 	"os/exec"
+	"crypto/x509"
 )
 
 type TLSSuite struct {
@@ -11,27 +12,7 @@ type TLSSuite struct {
 	NatsCmd  *exec.Cmd
 }
 
-var _ = Suite(&TLSSuite{})
-
-func (t *TLSSuite) SetUpSuite(c *C) {
-	t.NatsCmd = startNatsTLS(4555)
-	waitUntilNatsUp(4555)
-}
-
-func (t *TLSSuite) TearDownSuite(c *C) {
-	stopCmd(t.NatsCmd)
-}
-
-func (t *TLSSuite) TestNewTLSConnection(c *C) {
-
-	client := NewClient()
-
-	err := client.Connect(&TLSConnectionInfo{
-		&ConnectionInfo{Addr: "127.0.0.1:4555",
-			Username:        "nats",
-			Password:        "nats",
-		},
-		`-----BEGIN CERTIFICATE-----
+var CA = `-----BEGIN CERTIFICATE-----
 MIIGjzCCBHegAwIBAgIJAKT2W9SKY7o4MA0GCSqGSIb3DQEBCwUAMIGLMQswCQYD
 VQQGEwJVUzELMAkGA1UECBMCQ0ExFjAUBgNVBAcTDVNhbiBGcmFuY2lzY28xEzAR
 BgNVBAoTCkFwY2VyYSBJbmMxEDAOBgNVBAsTB25hdHMuaW8xEjAQBgNVBAMTCWxv
@@ -68,23 +49,9 @@ J59yo7KUn1nX7HsFvBVh9D8147J5BxtPztc0GtCQTXFT73nQapJjAd5J+AC5AB4t
 ShE+MRD+XIlPB/aMgtzz9Th8UCktVKoPOpFMC0SvFbbINWL/JO1QGhuZLMTKLjQN
 QBzjrETAOA9PICpI5hcPtTXz172X+I8/tIEFrZfew0Fdt/oAVcnb659zKiR8EuAq
 +Svp
------END CERTIFICATE-----`,
-	})
-	c.Assert(err, IsNil	)
-	t.Client = client
+-----END CERTIFICATE-----`
 
-	pingSuccess := client.Ping()
-	c.Assert(pingSuccess, Equals, true)
-}
-
-func (t *TLSSuite) TestNewTLSConnectionWithWrongCA(c *C) {
-
-	client := NewClient()
-
-	err := client.Connect(&TLSConnectionInfo{
-		&ConnectionInfo{Addr: "127.0.0.1:4555",
-		},
-		`-----BEGIN CERTIFICATE-----
+var InvalidCA = `-----BEGIN CERTIFICATE-----
 MIIDFDCCAfygAwIBAgIRANn247vhGXLev3Ltw8NOIQAwDQYJKoZIhvcNAQELBQAw
 MzEMMAoGA1UEBhMDVVNBMRYwFAYDVQQKEw1DbG91ZCBGb3VuZHJ5MQswCQYDVQQD
 EwJjYTAeFw0xNzA0MDMxOTQyMTVaFw0xODA0MDMxOTQyMTVaMDMxDDAKBgNVBAYT
@@ -102,7 +69,49 @@ bSTo1k+a33YtB8AWyS0GabG+2PEp/ARptJiQ6OMDKDLFMKK4NqpSl8cXNmPf5bEO
 67qHgr+2xtS4Mkj+EhZJuVpqIU3jL7psIQWdEm7dAy+qmZaB44LT1AMcUINgBsor
 bew6/PW7wNhEW/GWI/Nvef3EsFh80bYHq21eW6RdaSLgwddcmi6ak4CxizPYK57e
 XtrIuun84K30EXBrBdtUqWBwgBtu/HT2
------END CERTIFICATE-----`,
+-----END CERTIFICATE-----`
+
+var _ = Suite(&TLSSuite{})
+
+func (t *TLSSuite) SetUpSuite(c *C) {
+	t.NatsCmd = startNatsTLS(4555)
+	waitUntilNatsUp(4555)
+}
+
+func (t *TLSSuite) TearDownSuite(c *C) {
+	stopCmd(t.NatsCmd)
+}
+
+func (t *TLSSuite) TestNewTLSConnection(c *C) {
+	client := NewClient()
+
+	roots := x509.NewCertPool()
+    ok := roots.AppendCertsFromPEM([]byte(CA))
+	c.Assert(ok, Equals, true)
+
+	err := client.Connect(&ConnectionInfo{Addr: "127.0.0.1:4555",
+			Username:        "nats",
+			Password:        "nats",
+			CertPool:        roots,
+	})
+	c.Assert(err, IsNil	)
+	t.Client = client
+
+	pingSuccess := client.Ping()
+	c.Assert(pingSuccess, Equals, true)
+}
+
+func (t *TLSSuite) TestNewTLSConnectionWithWrongCA(c *C) {
+	client := NewClient()
+
+	roots := x509.NewCertPool()
+	ok := roots.AppendCertsFromPEM([]byte(InvalidCA))
+	c.Assert(ok, Equals, true)
+
+	err := client.Connect(&ConnectionInfo{Addr: "127.0.0.1:4555",
+		Username:        "nats",
+		Password:        "nats",
+		CertPool:        roots,
 	})
 
 	c.Assert(err, NotNil)
