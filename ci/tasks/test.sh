@@ -1,7 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
-export PATH=$HOME/gopath/bin:$PATH
+export GOPATH=$(pwd)/gopath
+cd gopath/src/github.com/cloudfoundry/yagnats
+
 go get -v github.com/nats-io/gnatsd
 go get gopkg.in/check.v1
 go get -v ./...
