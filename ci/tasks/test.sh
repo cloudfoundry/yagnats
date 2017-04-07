@@ -2,6 +2,8 @@
 set -e
 
 export GOPATH=$(pwd)/gopath
+export PATH=$(pwd)/gopath/bin:$PATH
+
 cd gopath/src/github.com/cloudfoundry/yagnats
 
 go get -v github.com/nats-io/gnatsd
