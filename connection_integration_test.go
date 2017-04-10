@@ -122,12 +122,10 @@ func (t *TLSSuite) TestNewTLSConnectionWithWrongCA(c *C) {
 func (t *TLSSuite) TestNewTLSConnectionWithEmptyCertPool(c *C) {
 	client := NewClient()
 
-	roots := x509.NewCertPool()
-
 	err := client.Connect(&ConnectionInfo{Addr: "127.0.0.1:4555",
 		Username: "nats",
 		Password: "nats",
-		CertPool: roots,
+		CertPool: x509.NewCertPool(),
 	})
 
 	c.Assert(err, NotNil)
