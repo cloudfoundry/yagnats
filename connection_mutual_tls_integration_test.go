@@ -94,7 +94,6 @@ func (t *MutualTLSSuite) TestNewMutualTLSConnectionWithInvalidClientCert(c *C) {
 
 	pingSuccess := client.Ping()
 	c.Assert(pingSuccess, Equals, false)
-
 }
 
 func (t *MutualTLSSuite) TestNewMutualTLSConnectionWithNoClientCert(c *C) {
@@ -115,5 +114,4 @@ func (t *MutualTLSSuite) TestNewMutualTLSConnectionWithNoClientCert(c *C) {
 
 	pingSuccess := client.Ping()
 	c.Assert(pingSuccess, Equals, false)
-
 }

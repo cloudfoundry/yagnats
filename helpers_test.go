@@ -96,8 +96,6 @@ func startNatsMutualTLS(port int) *exec.Cmd {
 
 	err = waitUntilNatsUp(port)
 
-	time.Sleep(time.Second * 20)
-
 	if err != nil {
 		panic("Cannot connect to NATS")
 	}
