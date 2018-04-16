@@ -20,4 +20,4 @@ resources:
 - name: daily
   type: time
   source:
-    interval: 1d
+    interval: 24h
