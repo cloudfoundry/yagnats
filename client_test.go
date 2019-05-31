@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
-
-	"strings"
 
 	. "gopkg.in/check.v1"
 )
@@ -116,8 +115,8 @@ func (s *YSuite) TestClientPingWhenNotConnected(c *C) {
 }
 
 func (s *YSuite) TestClientPingWhenConnectionClosed(c *C) {
-	conn := <-s.Client.connection
-	conn.Disconnect()
+	c.Assert(s.Client.Ping(), Equals, true)
+	s.Client.Disconnect()
 	c.Assert(s.Client.Ping(), Equals, false)
 }
 
@@ -602,7 +601,7 @@ func (s *YSuite) TestClientConnectOverTLSToNonTLSEnabledServer(c *C) {
 	})
 
 	c.Assert(err, NotNil)
-	c.Assert(strings.Contains(err.Error(), "tls: oversized record received with length"), Equals, true)
+	c.Assert(strings.Contains(err.Error(), "tls: first record does not look like a TLS handshake"), Equals, true)
 }
 
 func waitReceive(c *C, expected string, from chan []byte, ms time.Duration) {

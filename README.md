@@ -28,6 +28,7 @@ client.Publish("some.subject", []byte("Sup son?"))
 
 TLS:
 Add a cert pool to the ConnectionInfo to enable a TLS connection
+
 ```go
 roots := x509.NewCertPool()
 ok := roots.AppendCertsFromPEM([]byte("some-ca-cert-string"))
