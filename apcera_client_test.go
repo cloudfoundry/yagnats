@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nats-io/nats"
+	nats "github.com/nats-io/nats.go"
 
 	. "gopkg.in/check.v1"
 )
