@@ -5,8 +5,6 @@ jobs:
   plan:
     - get: yagnats
       trigger: true
-    - get: daily
-      trigger: true
     - task: test
       file: yagnats/ci/tasks/test.yml
 
@@ -16,8 +14,3 @@ resources:
   source:
     uri: https://github.com/cloudfoundry/yagnats
     branch: master
-
-- name: daily
-  type: time
-  source:
-    interval: 24h
